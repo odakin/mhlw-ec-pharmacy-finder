@@ -6,17 +6,90 @@ let META = {};
 
 const el = (id) => document.getElementById(id);
 
+// UI rendering limit (keeps the DOM light). Users can "show more" if needed.
+const RESULTS_STEP = 200;
+let CURRENT_ROWS = [];
+let CURRENT_LIMIT = RESULTS_STEP;
+
+// Standard prefecture order (north -> south)
+const PREF_ORDER = [
+  "北海道",
+  "青森県",
+  "岩手県",
+  "宮城県",
+  "秋田県",
+  "山形県",
+  "福島県",
+  "茨城県",
+  "栃木県",
+  "群馬県",
+  "埼玉県",
+  "千葉県",
+  "東京都",
+  "神奈川県",
+  "新潟県",
+  "富山県",
+  "石川県",
+  "福井県",
+  "山梨県",
+  "長野県",
+  "岐阜県",
+  "静岡県",
+  "愛知県",
+  "三重県",
+  "滋賀県",
+  "京都府",
+  "大阪府",
+  "兵庫県",
+  "奈良県",
+  "和歌山県",
+  "鳥取県",
+  "島根県",
+  "岡山県",
+  "広島県",
+  "山口県",
+  "徳島県",
+  "香川県",
+  "愛媛県",
+  "高知県",
+  "福岡県",
+  "佐賀県",
+  "長崎県",
+  "熊本県",
+  "大分県",
+  "宮崎県",
+  "鹿児島県",
+  "沖縄県",
+];
+
+const PREF_RANK = new Map(PREF_ORDER.map((p, i) => [p, i]));
+
+function cleanValue(v) {
+  if (v == null) return "";
+  const s = v.toString().replace(/\u3000/g, " ").trim(); // include full-width space
+  if (s.toLowerCase() === "nan") return "";
+  return s;
+}
+
 function normalizeText(s) {
   return (s || "")
     .toString()
     .toLowerCase()
+    // full-width digits -> ascii
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    // normalize common hyphens
+    .replace(/[－ー―−‐ｰ–—]/g, "-")
+    // full-width spaces -> normal spaces
+    .replace(/\u3000/g, " ")
+    // collapse whitespace
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function buildSearchBlob(r) {
   // Create a blob for quick matching
-  return normalizeText([r.pref, r.muni, r.name, r.addr, r.tel, r.url].filter(Boolean).join(" "));
+  const parts = [r.pref, r.muni, r.name, r.addr, r.tel, r.url].map(cleanValue).filter(Boolean);
+  return normalizeText(parts.join(" "));
 }
 
 function escapeHtml(s) {
@@ -28,15 +101,34 @@ function escapeHtml(s) {
     .replaceAll("'","&#039;");
 }
 
-function renderResults(rows) {
+function getPager() {
+  let pager = el("pager");
+  if (!pager) {
+    pager = document.createElement("div");
+    pager.id = "pager";
+    pager.className = "small";
+    el("list").parentElement.appendChild(pager);
+  }
+  return pager;
+}
+
+function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
   const list = el("list");
+  const pager = getPager();
+
+  // Clear previous results + notes (prevents message stacking)
   list.innerHTML = "";
+  pager.innerHTML = "";
+
   if (!rows.length) {
-    el("status").textContent = "該当なし。条件を変えてみてください。";
+    if (updateStatus) el("status").textContent = "該当なし。条件を変えてみてください。";
     return;
   }
-  el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（表示は最大 200 件）`;
-  const show = rows.slice(0, 200);
+
+  const show = rows.slice(0, limit);
+  if (updateStatus) {
+    el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（${show.length.toLocaleString()} 件表示）`;
+  }
 
   for (const r of show) {
     const li = document.createElement("li");
@@ -77,16 +169,27 @@ function renderResults(rows) {
     list.appendChild(li);
   }
 
-  if (rows.length > 200) {
-    const more = document.createElement("p");
-    more.className = "small";
-    more.textContent = `表示は 200 件までです。さらに絞り込んでください（現在 ${rows.length} 件）。`;
-    list.parentElement.appendChild(more);
+  if (show.length < rows.length) {
+    const p = document.createElement("p");
+    p.className = "small";
+    p.textContent = `結果が多いため、まず ${show.length.toLocaleString()} 件まで表示しています（全 ${rows.length.toLocaleString()} 件）。`;
+    pager.appendChild(p);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost";
+    const moreN = Math.min(RESULTS_STEP, rows.length - show.length);
+    btn.textContent = `さらに ${moreN.toLocaleString()} 件表示`;
+    btn.addEventListener("click", () => {
+      CURRENT_LIMIT = Math.min(CURRENT_LIMIT + RESULTS_STEP, rows.length);
+      renderResults(rows, CURRENT_LIMIT, true);
+    });
+    pager.appendChild(btn);
   }
 }
 
-function doSearch() {
-  const pref = el("prefSelect").value;
+function doSearch(resetLimit = true) {
+  const pref = cleanValue(el("prefSelect").value);
   const q = normalizeText(el("q").value);
   const onlyCallAhead = el("onlyCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
@@ -103,12 +206,25 @@ function doSearch() {
     return terms.every(t => blob.includes(t));
   });
 
-  renderResults(rows);
+  CURRENT_ROWS = rows;
+  if (resetLimit) CURRENT_LIMIT = RESULTS_STEP;
+
+  renderResults(CURRENT_ROWS, CURRENT_LIMIT, true);
 }
 
 function fillPrefOptions() {
-  const prefs = Array.from(new Set(DATA.map(r => r.pref).filter(Boolean))).sort();
   const sel = el("prefSelect");
+  // Remove existing options except the first "(指定なし)"
+  while (sel.options.length > 1) sel.remove(1);
+
+  const prefs = Array.from(new Set(DATA.map(r => r.pref).filter(Boolean)));
+  prefs.sort((a, b) => {
+    const ra = PREF_RANK.has(a) ? PREF_RANK.get(a) : 999;
+    const rb = PREF_RANK.has(b) ? PREF_RANK.get(b) : 999;
+    if (ra !== rb) return ra - rb;
+    return a.localeCompare(b, "ja");
+  });
+
   for (const p of prefs) {
     const opt = document.createElement("option");
     opt.value = p;
@@ -122,7 +238,16 @@ async function init() {
     const resp = await fetch("data.json");
     const json = await resp.json();
     META = json.meta || {};
-    DATA = (json.data || []).map(r => ({...r, _blob: buildSearchBlob(r)}));
+
+    DATA = (json.data || []).map(r => {
+      const rr = { ...r };
+      // Defensive trimming: prevents bugs like " 東京都" being treated as a different prefecture
+      for (const k of ["pref","muni","name","addr","tel","url","hours","privacy","callAhead","afterHours","afterHoursTel","notes"]) {
+        if (k in rr) rr[k] = cleanValue(rr[k]);
+      }
+      rr._blob = buildSearchBlob(rr);
+      return rr;
+    });
 
     el("asOf").textContent = META.asOf || "-";
     const src = META.sourcePage || "#";
@@ -131,8 +256,10 @@ async function init() {
     a.textContent = "厚生労働省（公式）";
 
     fillPrefOptions();
+
+    // Show a small sample list on load, but keep the "loaded" message.
+    renderResults(DATA.slice(0, 50), 50, false);
     el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局等データを読み込みました。条件を入れて検索できます。`;
-    renderResults(DATA.slice(0, 50));
   } catch (e) {
     console.error(e);
     el("status").textContent = "データの読み込みに失敗しました。";
@@ -141,18 +268,18 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", () => {
   init();
-  el("btnSearch").addEventListener("click", doSearch);
+  el("btnSearch").addEventListener("click", () => doSearch(true));
   el("btnClear").addEventListener("click", () => {
     el("q").value = "";
     el("prefSelect").value = "";
     el("onlyCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
-    doSearch();
+    doSearch(true);
   });
   el("q").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") doSearch();
+    if (ev.key === "Enter") doSearch(true);
   });
-  el("prefSelect").addEventListener("change", doSearch);
-  el("onlyCallAhead").addEventListener("change", doSearch);
-  el("onlyAfterHours").addEventListener("change", doSearch);
+  el("prefSelect").addEventListener("change", () => doSearch(true));
+  el("onlyCallAhead").addEventListener("change", () => doSearch(true));
+  el("onlyAfterHours").addEventListener("change", () => doSearch(true));
 });

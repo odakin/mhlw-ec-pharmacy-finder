@@ -65,6 +65,21 @@ def extract_as_of_date(html: str) -> str:
     return f"{year:04d}-{mm:02d}-{dd:02d}"
 
 
+def clean_text(val) -> str:
+    """
+    Trim leading/trailing whitespace (including full-width spaces),
+    and convert NaN-ish values to "".
+
+    This prevents bugs like " 東京都" (leading whitespace) being treated as a different prefecture.
+    """
+    if pd.isna(val):
+        return ""
+    s = str(val)
+    if s.lower() == "nan":
+        return ""
+    return s.replace("\u3000", " ").strip()
+
+
 def clean_phone(val) -> str:
     if pd.isna(val):
         return ""
@@ -175,6 +190,23 @@ def main() -> int:
     if "Unnamed: 0" in df.columns:
         df = df.drop(columns=["Unnamed: 0"])
 
+    # Trim whitespace early (prevents " 東京都" etc.)
+    for col in [
+        "都道府県",
+        "薬局等名称",
+        "住所",
+        "開局等時間",
+        "備考",
+        "プライバシー確保策",
+        "事前電話連絡",
+        "時間外対応",
+        "電話番号",
+        "時間外の電話番号",
+        "HP",
+    ]:
+        if col in df.columns:
+            df[col] = df[col].apply(clean_text)
+
     # Normalize types
     if "薬局等番号" in df.columns:
         df["薬局等番号"] = pd.to_numeric(df["薬局等番号"], errors="coerce").astype("Int64")
@@ -241,7 +273,7 @@ def main() -> int:
     app_df = df[cols].rename(columns={k: v for k, v in app_fields.items() if k in cols}).copy()
     for c in app_df.columns:
         if c != "id":
-            app_df[c] = app_df[c].replace({np.nan: ""})
+            app_df[c] = app_df[c].replace({np.nan: ""}).apply(clean_text)
 
     records = []
     for rec in app_df.to_dict(orient="records"):
