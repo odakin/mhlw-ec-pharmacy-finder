@@ -4,10 +4,14 @@
 let DATA = [];
 let META = {};
 
+// Some prefectures are listed only as "現在調整中" in the official sheet.
+// Treat those rows as "no individual stores listed yet" rather than a real store record.
+const PENDING_PREFS = new Set();
+
 const el = (id) => document.getElementById(id);
 
 // UI rendering limit (keeps the DOM light). Users can "show more" if needed.
-const RESULTS_STEP = 200;
+const RESULTS_STEP = 50;
 let CURRENT_ROWS = [];
 let CURRENT_LIMIT = RESULTS_STEP;
 
@@ -93,12 +97,13 @@ function buildSearchBlob(r) {
 }
 
 function escapeHtml(s) {
-  return (s || "").toString()
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll("\"","&quot;")
-    .replaceAll("'","&#039;");
+  return (s || "")
+    .toString()
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function getPager() {
@@ -191,20 +196,34 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 function doSearch(resetLimit = true) {
   const pref = cleanValue(el("prefSelect").value);
   const q = normalizeText(el("q").value);
-  const onlyCallAhead = el("onlyCallAhead").checked;
+  const onlyNotCallAhead = el("onlyNotCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
 
   const terms = q ? q.split(" ").filter(Boolean) : [];
 
-  const rows = DATA.filter(r => {
+  const rows = DATA.filter((r) => {
     if (pref && r.pref !== pref) return false;
-    if (onlyCallAhead && (r.callAhead || "") !== "要") return false;
+
+    // 「事前電話連絡：要」"ではない"ものだけ（＝ 要 の行を除外）
+    if (onlyNotCallAhead && (r.callAhead || "") === "要") return false;
+
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
 
     if (!terms.length) return true;
-    const blob = r._blob;
-    return terms.every(t => blob.includes(t));
+    return terms.every((t) => r._blob.includes(t));
   });
+
+  // 0件表示のときは「調整中」メッセージを優先して出す
+  if (!rows.length) {
+    renderResults([], RESULTS_STEP, false);
+    if (pref && PENDING_PREFS.has(pref)) {
+      el("status").textContent = `${pref} は現在調整中のため、公式リストに個別の薬局等が掲載されていません。`;
+    } else {
+      el("status").textContent = "該当なし。条件を変えてみてください。";
+    }
+    CURRENT_ROWS = [];
+    return;
+  }
 
   CURRENT_ROWS = rows;
   if (resetLimit) CURRENT_LIMIT = RESULTS_STEP;
@@ -217,7 +236,9 @@ function fillPrefOptions() {
   // Remove existing options except the first "(指定なし)"
   while (sel.options.length > 1) sel.remove(1);
 
-  const prefs = Array.from(new Set(DATA.map(r => r.pref).filter(Boolean)));
+  const prefs = Array.from(
+    new Set([...DATA.map((r) => r.pref).filter(Boolean), ...Array.from(PENDING_PREFS)])
+  );
   prefs.sort((a, b) => {
     const ra = PREF_RANK.has(a) ? PREF_RANK.get(a) : 999;
     const rb = PREF_RANK.has(b) ? PREF_RANK.get(b) : 999;
@@ -239,15 +260,41 @@ async function init() {
     const json = await resp.json();
     META = json.meta || {};
 
-    DATA = (json.data || []).map(r => {
+    // Load + sanitize + detect "現在調整中"
+    PENDING_PREFS.clear();
+    const real = [];
+    for (const r of json.data || []) {
       const rr = { ...r };
+
       // Defensive trimming: prevents bugs like " 東京都" being treated as a different prefecture
-      for (const k of ["pref","muni","name","addr","tel","url","hours","privacy","callAhead","afterHours","afterHoursTel","notes"]) {
+      for (const k of [
+        "pref",
+        "muni",
+        "name",
+        "addr",
+        "tel",
+        "url",
+        "hours",
+        "privacy",
+        "callAhead",
+        "afterHours",
+        "afterHoursTel",
+        "notes",
+      ]) {
         if (k in rr) rr[k] = cleanValue(rr[k]);
       }
+
+      const isPending = rr.name === "現在調整中" && !rr.muni && !rr.addr && !rr.tel && !rr.url;
+      if (isPending) {
+        if (rr.pref) PENDING_PREFS.add(rr.pref);
+        continue;
+      }
+
       rr._blob = buildSearchBlob(rr);
-      return rr;
-    });
+      real.push(rr);
+    }
+
+    DATA = real;
 
     el("asOf").textContent = META.asOf || "-";
     const src = META.sourcePage || "#";
@@ -258,7 +305,7 @@ async function init() {
     fillPrefOptions();
 
     // Show a small sample list on load, but keep the "loaded" message.
-    renderResults(DATA.slice(0, 50), 50, false);
+    renderResults(DATA.slice(0, RESULTS_STEP), RESULTS_STEP, false);
     el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局等データを読み込みました。条件を入れて検索できます。`;
   } catch (e) {
     console.error(e);
@@ -272,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
   el("btnClear").addEventListener("click", () => {
     el("q").value = "";
     el("prefSelect").value = "";
-    el("onlyCallAhead").checked = false;
+    el("onlyNotCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
     doSearch(true);
   });
@@ -280,6 +327,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (ev.key === "Enter") doSearch(true);
   });
   el("prefSelect").addEventListener("change", () => doSearch(true));
-  el("onlyCallAhead").addEventListener("change", () => doSearch(true));
+  el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
 });
