@@ -1,0 +1,44 @@
+name: Update MHLW EC pharmacy list
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly: Monday 03:00 JST (Sunday 18:00 UTC)
+    - cron: "0 18 * * 0"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+
+      - name: Update data
+        run: |
+          python scripts/update_data.py
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Update MHLW EC pharmacy list"
+          title: "Update MHLW EC pharmacy list"
+          body: |
+            Automated update from the official MHLW page.
+
+            - Source: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+            - Script: scripts/update_data.py
+          branch: "bot/update-mhlw-data"
+          delete-branch: true

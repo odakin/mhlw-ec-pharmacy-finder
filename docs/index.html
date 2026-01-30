@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>緊急避妊薬 販売可能な薬局等 検索（非公式）</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>緊急避妊薬（要指導医薬品）販売可能な薬局等 検索（非公式）</h1>
+    <p class="meta">
+      出典：<a id="sourceLink" href="#" target="_blank" rel="noopener">厚生労働省ページ</a> /
+      データ時点：<span id="asOf">-</span>
+    </p>
+    <p class="note">
+      市販化直後は在庫や販売可能な薬剤師の勤務状況が変動する可能性があるため、来局前に電話で確認することが推奨されています。<br>
+      このページは検索しやすさを目的にした非公式ツールです。最終確認は必ず公式情報と店舗への連絡でお願いします。
+    </p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <div class="row">
+        <label>
+          都道府県
+          <select id="prefSelect">
+            <option value="">（指定なし）</option>
+          </select>
+        </label>
+
+        <label>
+          フリーワード（例：渋谷 / 仙台 泉区 / ツルハ）
+          <input id="q" type="search" placeholder="地名・薬局名・住所など" autocomplete="off">
+        </label>
+
+        <button id="btnSearch" type="button">検索</button>
+        <button id="btnClear" type="button" class="ghost">クリア</button>
+      </div>
+
+      <div class="row small">
+        <label><input type="checkbox" id="onlyCallAhead">「事前電話連絡：要」だけ表示</label>
+        <label><input type="checkbox" id="onlyAfterHours">「時間外対応：有」だけ表示</label>
+      </div>
+
+      <p class="small">
+        検索のコツ：スペース区切りで複数キーワードを入れると「全部含む」ものだけに絞れます（例：<code>東京 港区</code>）。
+      </p>
+    </section>
+
+    <section class="results">
+      <p id="status">データ読み込み中…</p>
+      <ol id="list"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <p class="small">
+      免責：このツールは医療アドバイスを提供しません。購入可否・在庫・営業時間・条件等は各薬局等でご確認ください。
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

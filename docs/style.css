@@ -1,0 +1,34 @@
+/* Minimal, readable styling */
+:root { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif; line-height: 1.5; }
+body { margin: 0; background: #fafafa; color: #111; }
+header, main, footer { max-width: 980px; margin: 0 auto; padding: 16px; }
+header { background: white; border-bottom: 1px solid #ddd; }
+h1 { font-size: 1.25rem; margin: 0 0 8px; }
+.meta { margin: 0 0 10px; color: #333; }
+.note { margin: 0; padding: 10px; background: #fff7e6; border: 1px solid #ffd59e; border-radius: 8px; }
+.controls { background: white; border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+select, input[type="search"] { padding: 10px; border-radius: 8px; border: 1px solid #bbb; min-width: 220px; }
+button { padding: 10px 14px; border-radius: 8px; border: 1px solid #111; background: #111; color: white; cursor: pointer; }
+button.ghost { background: transparent; color: #111; }
+button:hover { opacity: 0.9; }
+.small { font-size: 0.85rem; color: #333; }
+.results { padding-top: 10px; }
+ol { padding-left: 0; list-style: none; margin: 0; }
+li { margin: 10px 0; }
+.card { background: white; border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
+.cardHead { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.name { font-weight: 700; font-size: 1rem; }
+.place { color: #333; margin-top: 4px; }
+.addr { color: #333; margin-top: 4px; }
+.links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.links a { color: #0b57d0; text-decoration: none; }
+.links a:hover { text-decoration: underline; }
+.detail { margin-top: 6px; color: #222; }
+.k { display: inline-block; padding: 2px 6px; border-radius: 6px; background: #eee; margin-right: 6px; font-size: 0.8rem; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid #bbb; background: #f4f4f4; }
+.badge.warn { border-color: #d47; background: #ffe6ef; }
+footer { color: #444; }
+code { background: #eee; padding: 2px 6px; border-radius: 6px; }
