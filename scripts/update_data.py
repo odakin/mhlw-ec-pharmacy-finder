@@ -44,13 +44,19 @@ def fetch_text(url: str) -> str:
 
 
 def extract_xlsx_url(html: str) -> str:
-    # Example:
-    # https://www.mhlw.go.jp/content/11120000/001643057.xlsx
-    m = re.search(r"""https://www\.mhlw\.go\.jp/content/[^"\'\s]+\.xlsx""", html)
+    # MHLW page often uses a relative URL like /content/...xlsx.
+    # Accept absolute or relative; normalize to absolute URL.
+    m = re.search(
+        r'''(?:https?://(?:www\.)?mhlw\.go\.jp)?/content/[^"'\s]+\.xlsx(?:\?[^"'\s]*)?''',
+        html,
+        flags=re.IGNORECASE,
+    )
     if not m:
         raise RuntimeError("XLSX URL not found in HTML.")
-    return m.group(0)
-
+    url = m.group(0)
+    if url.startswith("/"):
+        url = "https://www.mhlw.go.jp" + url
+    return url
 
 def extract_as_of_date(html: str) -> str:
     # e.g. 令和８年１月27日（火）時点
