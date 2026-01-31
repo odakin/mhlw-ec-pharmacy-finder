@@ -46,7 +46,7 @@ def fetch_text(url: str) -> str:
 def extract_xlsx_url(html: str) -> str:
     # Example:
     # https://www.mhlw.go.jp/content/11120000/001643057.xlsx
-    m = re.search(r"https://www\.mhlw\.go\.jp/content/[^\\"\s]+\.xlsx", html)
+    m = re.search(r"""https://www\.mhlw\.go\.jp/content/[^"\'\s]+\.xlsx""", html)
     if not m:
         raise RuntimeError("XLSX URL not found in HTML.")
     return m.group(0)
