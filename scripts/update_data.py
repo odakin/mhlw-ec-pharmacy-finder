@@ -29,6 +29,48 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pandas as pd
 
+def _norm_col(x):
+    import re as _re
+    return _re.sub(r"\s+", "", str(x).replace("\u3000", " ")).strip()
+
+def col_like(df, key, default="", avoid=()):
+    """Return a column as a Series, tolerant to header variations.
+    - exact match after whitespace normalization
+    - prefix match
+    - contains match
+    If not found, returns a same-length Series filled with default.
+    """
+    key_n = _norm_col(key)
+    avoid_n = [_norm_col(a) for a in avoid]
+
+    def ok(cn):
+        return not any(a and a in cn for a in avoid_n)
+
+    best = None
+    for c in df.columns:
+        cn = _norm_col(c)
+        if cn == key_n:
+            best = c
+            break
+    if best is None:
+        for c in df.columns:
+            cn = _norm_col(c)
+            if cn.startswith(key_n) and ok(cn):
+                best = c
+                break
+    if best is None:
+        for c in df.columns:
+            cn = _norm_col(c)
+            if key_n in cn and ok(cn):
+                best = c
+                break
+
+    if best is None:
+        import pandas as pd
+        return pd.Series([default] * len(df), index=df.index)
+    return df[best]
+
+
 SOURCE_PAGE = "https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html"
 
 # Full-width digits to ASCII + normalize hyphens
@@ -221,8 +263,9 @@ def main() -> int:
         if col in df.columns:
             df[col] = df[col].astype(str)
 
-    df["電話番号_数字"] = df.get("電話番号", "").apply(clean_phone)
-    df["時間外の電話番号_数字"] = df.get("時間外の電話番号", "").apply(clean_phone)
+    tel = col_like(df, "電話番号", default="", avoid=("時間外",)).fillna("")
+    df["電話番号_数字"] = tel.astype(str).apply(clean_phone)
+    df["時間外の電話番号_数字"] = col_like(df, "時間外の電話番号").apply(clean_phone)
 
     if "HP" in df.columns:
         df["HP"] = df["HP"].apply(normalize_url)
