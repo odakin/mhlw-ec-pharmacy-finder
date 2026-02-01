@@ -256,7 +256,8 @@ function fillPrefOptions() {
 
 async function init() {
   try {
-    const resp = await fetch("data.json");
+    // Avoid stale CDN/browser cache after data updates on GitHub Pages.
+    const resp = await fetch("data.json", { cache: "no-cache" });
     const json = await resp.json();
     META = json.meta || {};
 

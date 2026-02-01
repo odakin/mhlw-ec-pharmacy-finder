@@ -43,6 +43,25 @@ jobs:
         run: |
           python scripts/update_data.py
 
+      - name: Validate docs/data.json (strict JSON)
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('docs/data.json','utf8'))"
+          node - <<'NODE'
+          const fs = require('fs');
+          const j = JSON.parse(fs.readFileSync('docs/data.json','utf8'));
+          if (!j || typeof j !== 'object') throw new Error('data.json must be an object');
+          if (!j.meta || typeof j.meta !== 'object') throw new Error('missing meta');
+          if (!Array.isArray(j.data)) throw new Error('data must be an array');
+          const r = j.data.find(x => x && typeof x === 'object');
+          if (!r) throw new Error('data has no records');
+          for (const k of ['pref','name','addr']) {
+            if (!(k in r)) throw new Error(`missing key in records: ${k}`);
+          }
+          const ok = j.data.some(x => x && typeof x === 'object' && x.pref && x.name && x.addr);
+          if (!ok) throw new Error('records exist but look empty (pref/name/addr missing)');
+          console.log('shape+content OK');
+          NODE
+
       - name: Commit & push if changed
         run: |
           set -e
