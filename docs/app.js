@@ -75,6 +75,11 @@ function cleanValue(v) {
   return s;
 }
 
+function toInt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
 function normalizeText(s) {
   return (s || "")
     .toString()
@@ -148,6 +153,17 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
     const tel = (r.tel || "").toString();
     const telLink = tel ? `<a href="tel:${escapeHtml(tel)}">${escapeHtml(tel)}</a>` : "";
+
+    const afterTel = (r.afterHoursTel || "").toString();
+    const showAfterTel = afterTel && afterTel !== tel;
+    const afterTelLink = showAfterTel
+      ? `<a href="tel:${escapeHtml(afterTel)}">${escapeHtml(afterTel)}</a>`
+      : "";
+
+    const pf = toInt(r.pharmacistsFemale);
+    const pm = toInt(r.pharmacistsMale);
+    const pn = toInt(r.pharmacistsNoAnswer);
+    const hasPharmacists = (pf + pm + pn) > 0;
     const url = (r.url || "").toString().trim();
     const urlLink = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">公式/店舗ページ</a>` : "";
 
@@ -164,9 +180,11 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
         <div class="addr">${addr}</div>
         <div class="links">
           ${telLink ? `<span>📞 ${telLink}</span>` : ``}
+          ${afterTelLink ? `<span>🌙 時間外 ${afterTelLink}</span>` : ``}
           ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
         </div>
         ${hours ? `<div class="detail"><span class="k">開局等時間</span> ${hours}</div>` : ``}
+        ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
         ${privacy ? `<div class="detail"><span class="k">プライバシー</span> ${privacy}</div>` : ``}
         ${notes ? `<div class="detail"><span class="k">備考</span> ${notes}</div>` : ``}
       </div>
@@ -198,6 +216,8 @@ function doSearch(resetLimit = true) {
   const q = normalizeText(el("q").value);
   const onlyNotCallAhead = el("onlyNotCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
+  const hasFemale = el("hasFemale").checked;
+  const hasMale = el("hasMale").checked;
 
   const terms = q ? q.split(" ").filter(Boolean) : [];
 
@@ -208,6 +228,14 @@ function doSearch(resetLimit = true) {
     if (onlyNotCallAhead && (r.callAhead || "") === "要") return false;
 
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
+
+    // Gender filters are OR (multi-select). If none selected, do not filter.
+    if (hasFemale || hasMale) {
+      const f = toInt(r.pharmacistsFemale);
+      const m = toInt(r.pharmacistsMale);
+      const ok = (hasFemale && f > 0) || (hasMale && m > 0);
+      if (!ok) return false;
+    }
 
     if (!terms.length) return true;
     return terms.every((t) => r._blob.includes(t));
@@ -285,6 +313,11 @@ async function init() {
         if (k in rr) rr[k] = cleanValue(rr[k]);
       }
 
+      // These are counts; keep as numbers (missing -> 0)
+      rr.pharmacistsFemale = toInt(rr.pharmacistsFemale);
+      rr.pharmacistsMale = toInt(rr.pharmacistsMale);
+      rr.pharmacistsNoAnswer = toInt(rr.pharmacistsNoAnswer);
+
       const isPending = rr.name === "現在調整中" && !rr.muni && !rr.addr && !rr.tel && !rr.url;
       if (isPending) {
         if (rr.pref) PENDING_PREFS.add(rr.pref);
@@ -322,6 +355,8 @@ document.addEventListener("DOMContentLoaded", () => {
     el("prefSelect").value = "";
     el("onlyNotCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
+    el("hasFemale").checked = false;
+    el("hasMale").checked = false;
     doSearch(true);
   });
   el("q").addEventListener("keydown", (ev) => {
@@ -330,4 +365,6 @@ document.addEventListener("DOMContentLoaded", () => {
   el("prefSelect").addEventListener("change", () => doSearch(true));
   el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
+  el("hasFemale").addEventListener("change", () => doSearch(true));
+  el("hasMale").addEventListener("change", () => doSearch(true));
 });
