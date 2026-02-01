@@ -71,6 +71,55 @@ def col_like(df, key, default="", avoid=()):
     return df[best]
 
 
+def read_mhlw_xlsx_table(xlsx_path: Path) -> pd.DataFrame:
+    """Read the first sheet of the official XLSX into a DataFrame with the
+    correct header row.
+
+    The MHLW XLSX sometimes starts with blank rows and/or a multi-row header.
+    When pandas reads such a sheet with the default header=0, the real headers
+    end up as the first *data* row and the columns become Unnamed.*
+
+    We detect the header row by searching for known header tokens (e.g.
+    '都道府県', '薬局等名称', '住所') in the first few rows.
+    """
+
+    raw0 = pd.read_excel(xlsx_path, sheet_name=0, header=None)
+
+    def norm_cell(x) -> str:
+        if pd.isna(x):
+            return ""
+        return _norm_col(x)
+
+    header_row = None
+    for i in range(min(30, len(raw0))):
+        row = [norm_cell(x) for x in raw0.iloc[i].tolist()]
+        if ("都道府県" in row) and ("住所" in row) and any(("薬局" in c and "名称" in c) for c in row):
+            header_row = i
+            break
+
+    if header_row is None:
+        # fallback: first non-empty row
+        for i in range(min(30, len(raw0))):
+            if raw0.iloc[i].notna().any():
+                header_row = i
+                break
+        if header_row is None:
+            header_row = 0
+
+    df = raw0.iloc[header_row + 1 :].copy()
+    df.columns = raw0.iloc[header_row].tolist()
+
+    # Drop columns whose header cell is empty/NaN
+    df = df.loc[:, [c for c in df.columns if not pd.isna(c) and str(c).strip() != ""]]
+
+    # Drop fully empty rows
+    df = df.dropna(how="all")
+
+    # Normalize column names (trim whitespace / full-width spaces)
+    df = df.rename(columns=lambda c: str(c).replace("\u3000", " ").strip())
+    return df
+
+
 SOURCE_PAGE = "https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html"
 
 # Full-width digits to ASCII + normalize hyphens
@@ -203,6 +252,55 @@ def split_address(pref: str, full_addr: str):
     return (s, without, municipality.strip(), remaining.strip())
 
 
+def looks_like_valid_app_json(path: Path, as_of: str) -> bool:
+    """Heuristic validation so we can safely skip regeneration.
+
+    We only skip when:
+    - JSON parses
+    - meta.asOf matches
+    - data is a list
+    - at least one record has the keys the web UI expects
+    """
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+
+    if not isinstance(obj, dict):
+        return False
+    meta = obj.get("meta")
+    data = obj.get("data")
+    if not isinstance(meta, dict) or not isinstance(data, list):
+        return False
+    if meta.get("asOf") != as_of:
+        return False
+
+    # Find the first dict-like record
+    rec0 = None
+    for r in data:
+        if isinstance(r, dict):
+            rec0 = r
+            break
+    if rec0 is None:
+        return False
+
+    required = {"id", "pref", "muni", "name", "addr", "tel", "url", "hours", "afterHours", "afterHoursTel", "privacy", "callAhead", "notes"}
+    if not required.issubset(set(rec0.keys())):
+        return False
+
+    # Also require that the dataset isn't "structurally valid but empty".
+    return any(
+        isinstance(r, dict) and r.get("pref") and r.get("name") and r.get("addr")
+        for r in data
+    )
+
+
+def write_json_strict(path: Path, obj) -> None:
+    """Write strict JSON (no NaN/Infinity) to avoid breaking browsers."""
+    s = json.dumps(obj, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    path.write_text(s, encoding="utf-8")
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     data_dir = repo_root / "data"
@@ -214,10 +312,16 @@ def main() -> int:
     xlsx_url = extract_xlsx_url(html)
     as_of = extract_as_of_date(html)
 
-    # If already have this as-of version, skip to avoid noisy commits
+    # If already have this as-of version *and it's valid*, skip to avoid noisy commits.
+    # (If a previous run produced a broken JSON, we must regenerate even for the same as-of date.)
     existing_json = data_dir / f"data_{as_of}.json"
-    if existing_json.exists():
-        print(f"No update needed: data_{as_of}.json already exists.")
+    if existing_json.exists() and looks_like_valid_app_json(existing_json, as_of):
+        # Keep UI/bot copies in sync (in case they were manually edited).
+        docs_dir.mkdir(parents=True, exist_ok=True)
+        line_dir.mkdir(parents=True, exist_ok=True)
+        (docs_dir / "data.json").write_text(existing_json.read_text(encoding="utf-8"), encoding="utf-8")
+        (line_dir / "data.json").write_text(existing_json.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"No update needed: data_{as_of}.json already exists and looks valid.")
         return 0
 
     # Download XLSX
@@ -225,9 +329,26 @@ def main() -> int:
     with urlopen(Request(xlsx_url, headers={"User-Agent": "Mozilla/5.0"})) as r:
         raw_xlsx_path.write_bytes(r.read())
 
-    # Load & normalize
-    raw = pd.read_excel(raw_xlsx_path, sheet_name=0)
-    df = raw.iloc[1:].copy()  # skip merged header row
+    # Load & normalize (robust header handling)
+    df = read_mhlw_xlsx_table(raw_xlsx_path)
+
+    # Create canonical columns used below (official header labels vary across versions)
+    df["薬局等番号"] = col_like(df, "薬局等番号", default="")
+    df["都道府県"] = col_like(df, "都道府県", default="")
+    df["薬局等名称"] = col_like(df, "薬局等名称", default="")
+    df["住所"] = col_like(df, "住所", default="")
+    df["電話番号"] = col_like(df, "電話番号", default="", avoid=("時間外",))
+    df["時間外の電話番号"] = col_like(df, "時間外の電話番号", default="")
+    df["HP"] = col_like(df, "HP", default="")
+    # These columns have known variations:
+    # - 開局等時間 / 開局時間
+    # - 時間外対応 / 時間外対応の有無
+    # - 事前電話連絡 / 事前連絡
+    df["開局等時間"] = col_like(df, "開局", default="")
+    df["時間外対応"] = col_like(df, "時間外対応", default="")
+    df["事前電話連絡"] = col_like(df, "事前", default="")
+    df["プライバシー確保策"] = col_like(df, "プライバシー", default="")
+    df["備考"] = col_like(df, "備考", default="")
 
     # Fix the split header in the original file
     df = df.rename(columns={
@@ -255,9 +376,19 @@ def main() -> int:
         if col in df.columns:
             df[col] = df[col].apply(clean_text)
 
+    # Sanity check: if we couldn't parse the real header, these will be empty.
+    if (df["都道府県"].astype(str).str.strip() == "").all() or (df["薬局等名称"].astype(str).str.strip() == "").all():
+        raise RuntimeError(
+            "Parsed XLSX but key columns are empty (都道府県/薬局等名称). "
+            "The header layout likely changed again; update the parser."
+        )
+
     # Normalize types
     if "薬局等番号" in df.columns:
-        df["薬局等番号"] = pd.to_numeric(df["薬局等番号"], errors="coerce").astype("Int64")
+        id_num = pd.to_numeric(df["薬局等番号"], errors="coerce")
+        mask = id_num.notna()
+        df = df[mask].copy()
+        df["薬局等番号"] = id_num[mask].astype("Int64")
 
     for col in ["電話番号", "時間外の電話番号"]:
         if col in df.columns:
@@ -322,7 +453,8 @@ def main() -> int:
     app_df = df[cols].rename(columns={k: v for k, v in app_fields.items() if k in cols}).copy()
     for c in app_df.columns:
         if c != "id":
-            app_df[c] = app_df[c].replace({np.nan: ""}).apply(clean_text)
+            # Prevent NaN/pd.NA from leaking into JSON (browsers reject NaN).
+            app_df[c] = app_df[c].replace({np.nan: "", pd.NA: ""}).fillna("").apply(clean_text)
 
     records = []
     for rec in app_df.to_dict(orient="records"):
@@ -341,7 +473,7 @@ def main() -> int:
         "data": records,
     }
     out_json = data_dir / f"data_{as_of}.json"
-    out_json.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    write_json_strict(out_json, payload)
 
     # Copy to places used by the UI / bot
     docs_dir.mkdir(parents=True, exist_ok=True)
