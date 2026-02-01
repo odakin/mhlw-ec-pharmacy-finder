@@ -33,6 +33,11 @@ function normalizeText(s) {
     .trim();
 }
 
+function toInt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
 function detectPref(text) {
   const t = text.replace(/\s+/g, "");
   // allow forms like 東京 / 東京都
@@ -60,13 +65,19 @@ function search(text) {
 
 function formatResult(r) {
   const tel = r.tel ? `📞 ${r.tel}` : "";
+  const afterTel = (r.afterHoursTel && r.afterHoursTel !== r.tel) ? `🌙 時間外: ${r.afterHoursTel}` : "";
   const url = r.url ? `🔗 ${r.url}` : "";
   const callAhead = (r.callAhead || "") === "要" ? "（事前電話：要）" : "";
+
+  const pf = toInt(r.pharmacistsFemale);
+  const pm = toInt(r.pharmacistsMale);
+  const pn = toInt(r.pharmacistsNoAnswer);
+  const pharma = (pf + pm + pn) > 0 ? `薬剤師（性別・人数）: 女性${pf} 男性${pm} 答えたくない${pn}` : "";
   return [
     `🏥 ${r.name || ""} ${callAhead}`,
     `${r.pref || ""}${r.muni ? " " + r.muni : ""}`,
     `${r.addr || ""}`,
-    [tel, url].filter(Boolean).join("\n")
+    [tel, afterTel, url, pharma].filter(Boolean).join("\n")
   ].filter(Boolean).join("\n");
 }
 

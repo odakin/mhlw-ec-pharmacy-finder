@@ -39,9 +39,17 @@
       </div>
 
       <div class="row small">
-        <label><input type="checkbox" id="onlyNotCallAhead">「事前電話連絡：要」ではないものだけ表示</label>
-        <label><input type="checkbox" id="onlyAfterHours">「時間外対応：有」だけ表示</label>
+        <div class="filters" role="group" aria-label="絞り込み">
+          <label class="filter"><input type="checkbox" id="onlyNotCallAhead"><span>事前連絡「要」を除く</span></label>
+          <label class="filter"><input type="checkbox" id="onlyAfterHours"><span>時間外対応あり</span></label>
+          <label class="filter"><input type="checkbox" id="hasFemale"><span>女性薬剤師がいる</span></label>
+          <label class="filter"><input type="checkbox" id="hasMale"><span>男性薬剤師がいる</span></label>
+        </div>
       </div>
+
+      <p class="filtersNote small">
+        ※性別は公式一覧の「販売可能薬剤師・性別（人数）」の記載に基づきます（勤務状況は変動し得ます）。
+      </p>
 
       <p class="small">
         検索のコツ：スペース区切りで複数キーワードを入れると「全部含む」ものだけに絞れます（例：<code>東京 港区</code>）。

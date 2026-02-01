@@ -32,3 +32,9 @@ li { margin: 10px 0; }
 .badge.warn { border-color: #d47; background: #ffe6ef; }
 footer { color: #444; }
 code { background: #eee; padding: 2px 6px; border-radius: 6px; }
+
+/* Filter "chips" */
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.filter { display: inline-flex; flex-direction: row; gap: 8px; align-items: center; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; background: #fafafa; user-select: none; }
+.filter input { margin: 0; }
+.filtersNote { margin: 6px 0 0; }

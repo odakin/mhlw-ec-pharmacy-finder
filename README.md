@@ -4,7 +4,7 @@
 検索しやすい **CSV / XLSX / JSON** に整形し、さらに **静的Web検索（GitHub Pages）** と **LINE Botサンプル** を添えたものです。
 
 - 出典（公式ページ）: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
-- 最新取り込みデータ時点: 2026-01-27
+- 最新取り込みデータ時点: 2026-01-31
 - 生成物:
   - `data/` : 整形済みデータ（CSV/XLSX/JSON、原本XLSXも保存）
   - `docs/` : 静的Web検索（GitHub Pages用）
@@ -45,13 +45,20 @@ python -m http.server 8000
 
 ## 2) 整形済みデータ
 
-- `data/mhlw_ec_pharmacies_cleaned_2026-01-27.xlsx`
-- `data/mhlw_ec_pharmacies_cleaned_2026-01-27.csv`（UTF-8 BOM）
-- `data/data_2026-01-27.json`（Web/LINE Bot用）
+- `data/mhlw_ec_pharmacies_cleaned_2026-01-31.xlsx`
+- `data/mhlw_ec_pharmacies_cleaned_2026-01-31.csv`（UTF-8 BOM）
+- `data/data_2026-01-31.json`（Web/LINE Bot用）
 
 追加した列（例）:
 - `市区町村_推定`：住所文字列から市区町村相当を推定（完璧ではありません）
 - `電話番号_数字`：ハイフン等を除去して通話リンクに使いやすくしたもの
+- `時間外の電話番号_数字`：時間外の電話番号を同様に数字化したもの
+- `販売可能薬剤師数_女性` / `販売可能薬剤師数_男性` / `販売可能薬剤師数_答えたくない`：公式一覧の「販売可能薬剤師・性別（人数）」
+
+Web UI の絞り込み:
+- 事前連絡「要」を除く
+- 時間外対応あり
+- 女性薬剤師がいる / 男性薬剤師がいる（※性別フィルタは OR：どちらかに該当すれば表示）
 
 ---
 
@@ -79,6 +86,9 @@ npm start
 ```bash
 pip install -r scripts/requirements.txt
 python scripts/update_data.py
+
+# 参考：ローカルに保存した XLSX から再生成する場合
+# python scripts/update_data.py --xlsx path/to/source.xlsx --as-of YYYY-MM-DD
 ```
 
 更新が入ると、次が作られます:

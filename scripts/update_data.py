@@ -20,6 +20,7 @@ https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
 
 from __future__ import annotations
 
+import argparse
 import datetime
 import json
 import re
@@ -122,6 +123,32 @@ def read_mhlw_xlsx_table(xlsx_path: Path) -> pd.DataFrame:
 
 SOURCE_PAGE = "https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html"
 
+
+def guess_as_of_from_xlsx(xlsx_path: Path) -> str:
+    """Best-effort guess for --as-of when using a local XLSX.
+
+    MHLW files often use a sheet name like "★260131公表用（一般向け）".
+    We interpret 260131 as YYYYMMDD -> 2026-01-31.
+    """
+    try:
+        import openpyxl
+
+        wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
+        for name in wb.sheetnames:
+            m = re.search(r"(\d{6})", str(name))
+            if not m:
+                continue
+            yymmdd = m.group(1)
+            yy = int(yymmdd[0:2])
+            mm = int(yymmdd[2:4])
+            dd = int(yymmdd[4:6])
+            year = 2000 + yy
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                return f"{year:04d}-{mm:02d}-{dd:02d}"
+    except Exception:
+        pass
+    return datetime.date.today().isoformat()
+
 # Full-width digits to ASCII + normalize hyphens
 _digit_map = {ord(fw): ord(hw) for fw, hw in zip("０１２３４５６７８９", "0123456789")}
 for h in "－ー―−‐ｰ–—":
@@ -185,6 +212,23 @@ def clean_phone(val) -> str:
         return ""
     s = s.translate(_digit_map)
     return re.sub(r"[^0-9]", "", s)
+
+
+def clean_int(val, default: int = 0) -> int:
+    """Parse an integer-ish cell (counts) safely.
+
+    The official sheet often leaves "0" cells blank. We treat blanks/NaN as 0.
+    """
+    if pd.isna(val):
+        return default
+    s = str(val).strip()
+    if not s or s.lower() == "nan":
+        return default
+    try:
+        # Handle values like "1", "1.0".
+        return int(float(s))
+    except Exception:
+        return default
 
 
 def normalize_url(u) -> str:
@@ -284,7 +328,7 @@ def looks_like_valid_app_json(path: Path, as_of: str) -> bool:
     if rec0 is None:
         return False
 
-    required = {"id", "pref", "muni", "name", "addr", "tel", "url", "hours", "afterHours", "afterHoursTel", "privacy", "callAhead", "notes"}
+    required = {"id", "pref", "muni", "name", "addr", "tel", "url", "hours", "afterHours", "afterHoursTel", "privacy", "callAhead", "notes", "pharmacistsFemale", "pharmacistsMale", "pharmacistsNoAnswer"}
     if not required.issubset(set(rec0.keys())):
         return False
 
@@ -301,16 +345,39 @@ def write_json_strict(path: Path, obj) -> None:
     path.write_text(s, encoding="utf-8")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     repo_root = Path(__file__).resolve().parents[1]
     data_dir = repo_root / "data"
     docs_dir = repo_root / "docs"
     line_dir = repo_root / "line_bot"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    html = fetch_text(SOURCE_PAGE)
-    xlsx_url = extract_xlsx_url(html)
-    as_of = extract_as_of_date(html)
+    parser = argparse.ArgumentParser(
+        description="Fetch the latest MHLW XLSX (or use a local XLSX), normalize it, and regenerate CSV/XLSX/JSON artifacts."
+    )
+    parser.add_argument("--xlsx", type=Path, default=None, help="Use a local XLSX file instead of downloading from the MHLW page")
+    parser.add_argument("--as-of", dest="as_of", default=None, help="Override as-of date (YYYY-MM-DD)")
+    parser.add_argument("--source-page", dest="source_page", default=SOURCE_PAGE, help="Override the source page URL used in metadata")
+    parser.add_argument("--source-xlsx", dest="source_xlsx", default=None, help="Override the source XLSX URL used in metadata")
+    args = parser.parse_args(argv)
+
+    source_page = args.source_page
+
+    if args.xlsx:
+        as_of = args.as_of or guess_as_of_from_xlsx(args.xlsx)
+        xlsx_url = args.source_xlsx or ""
+        # Keep a dated copy under data/ (matches the download naming convention).
+        raw_xlsx_path = data_dir / f"source_raw_{as_of}.xlsx"
+        raw_xlsx_path.write_bytes(Path(args.xlsx).read_bytes())
+    else:
+        html = fetch_text(source_page)
+        xlsx_url = extract_xlsx_url(html)
+        as_of = args.as_of or extract_as_of_date(html)
+
+        # Download XLSX
+        raw_xlsx_path = data_dir / f"source_raw_{as_of}.xlsx"
+        with urlopen(Request(xlsx_url, headers={"User-Agent": "Mozilla/5.0"})) as r:
+            raw_xlsx_path.write_bytes(r.read())
 
     # If already have this as-of version *and it's valid*, skip to avoid noisy commits.
     # (If a previous run produced a broken JSON, we must regenerate even for the same as-of date.)
@@ -323,11 +390,6 @@ def main() -> int:
         (line_dir / "data.json").write_text(existing_json.read_text(encoding="utf-8"), encoding="utf-8")
         print(f"No update needed: data_{as_of}.json already exists and looks valid.")
         return 0
-
-    # Download XLSX
-    raw_xlsx_path = data_dir / f"source_raw_{as_of}.xlsx"
-    with urlopen(Request(xlsx_url, headers={"User-Agent": "Mozilla/5.0"})) as r:
-        raw_xlsx_path.write_bytes(r.read())
 
     # Load & normalize (robust header handling)
     df = read_mhlw_xlsx_table(raw_xlsx_path)
@@ -351,11 +413,21 @@ def main() -> int:
     df["備考"] = col_like(df, "備考", default="")
 
     # Fix the split header in the original file
+    # The gender/count section has changed formats over time:
+    # - Older: "販売可能薬剤師数・性別" + Unnamed columns
+    # - Newer: merged header "販売可能薬剤師・性別" with subheaders: 女性 / 男性 / 答えたくない
     df = df.rename(columns={
         "販売可能薬剤師数・性別": "販売可能薬剤師数_女性",
+        "販売可能薬剤師・性別": "販売可能薬剤師数_女性",
         "Unnamed: 7": "販売可能薬剤師数_男性",
         "Unnamed: 8": "販売可能薬剤師数_答えたくない",
     })
+    if "販売可能薬剤師数_女性" not in df.columns and "女性" in df.columns:
+        df = df.rename(columns={"女性": "販売可能薬剤師数_女性"})
+    if "販売可能薬剤師数_男性" not in df.columns and "男性" in df.columns:
+        df = df.rename(columns={"男性": "販売可能薬剤師数_男性"})
+    if "販売可能薬剤師数_答えたくない" not in df.columns and "答えたくない" in df.columns:
+        df = df.rename(columns={"答えたくない": "販売可能薬剤師数_答えたくない"})
     if "Unnamed: 0" in df.columns:
         df = df.drop(columns=["Unnamed: 0"])
 
@@ -375,6 +447,11 @@ def main() -> int:
     ]:
         if col in df.columns:
             df[col] = df[col].apply(clean_text)
+
+    # Gender count columns are numeric-ish; treat blanks as 0.
+    for col in ["販売可能薬剤師数_女性", "販売可能薬剤師数_男性", "販売可能薬剤師数_答えたくない"]:
+        if col in df.columns:
+            df[col] = df[col].apply(clean_int)
 
     # Sanity check: if we couldn't parse the real header, these will be empty.
     if (df["都道府県"].astype(str).str.strip() == "").all() or (df["薬局等名称"].astype(str).str.strip() == "").all():
@@ -415,7 +492,7 @@ def main() -> int:
         df["事前電話連絡_要否"] = df["事前電話連絡"].apply(lambda x: True if str(x).strip() == "要" else False)
 
     df["データ時点"] = as_of
-    df["データ出典_URL"] = SOURCE_PAGE
+    df["データ出典_URL"] = source_page
     df["データファイル_URL"] = xlsx_url
 
     # Write cleaned XLSX/CSV
@@ -424,7 +501,7 @@ def main() -> int:
         df.to_excel(w, index=False, sheet_name="clean")
         meta = pd.DataFrame([{
             "asOf": as_of,
-            "sourcePage": SOURCE_PAGE,
+            "sourcePage": source_page,
             "sourceXlsx": xlsx_url,
             "generatedAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "records": int(len(df)),
@@ -448,11 +525,21 @@ def main() -> int:
         "プライバシー確保策": "privacy",
         "事前電話連絡": "callAhead",
         "備考": "notes",
+        "販売可能薬剤師数_女性": "pharmacistsFemale",
+        "販売可能薬剤師数_男性": "pharmacistsMale",
+        "販売可能薬剤師数_答えたくない": "pharmacistsNoAnswer",
     }
     cols = [c for c in app_fields.keys() if c in df.columns]
     app_df = df[cols].rename(columns={k: v for k, v in app_fields.items() if k in cols}).copy()
+    num_keys = {"pharmacistsFemale", "pharmacistsMale", "pharmacistsNoAnswer"}
     for c in app_df.columns:
-        if c != "id":
+        if c == "id":
+            continue
+
+        if c in num_keys:
+            # Keep these as numbers in JSON (safer + easier for UI filtering)
+            app_df[c] = pd.to_numeric(app_df[c], errors="coerce").fillna(0).astype(int)
+        else:
             # Prevent NaN/pd.NA from leaking into JSON (browsers reject NaN).
             app_df[c] = app_df[c].replace({np.nan: "", pd.NA: ""}).fillna("").apply(clean_text)
 
@@ -465,7 +552,7 @@ def main() -> int:
     payload = {
         "meta": {
             "asOf": as_of,
-            "sourcePage": SOURCE_PAGE,
+            "sourcePage": source_page,
             "sourceXlsx": xlsx_url,
             "generatedAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "records": len(records),
