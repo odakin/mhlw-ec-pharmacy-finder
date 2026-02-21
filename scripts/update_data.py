@@ -345,6 +345,50 @@ def write_json_strict(path: Path, obj) -> None:
     path.write_text(s, encoding="utf-8")
 
 
+def update_readme_as_of(repo_root: Path, as_of: str) -> bool:
+    """Update README.md markers so the repo stays self-describing.
+
+    We keep these in sync:
+    - "- 最新取り込みデータ時点: YYYY-MM-DD"
+    - Example artifact filenames under "2) 整形済みデータ"
+    """
+    readme = repo_root / "README.md"
+    if not readme.exists():
+        return False
+
+    text = readme.read_text(encoding="utf-8")
+    orig = text
+
+    # Latest as-of marker
+    text = re.sub(
+        r"(?m)^(-\s*最新取り込みデータ時点:\s*)(\d{4}-\d{2}-\d{2})\s*$",
+        r"\g<1>" + as_of,
+        text,
+    )
+
+    # Update example filenames (keep other dates untouched)
+    text = re.sub(
+        r"(mhlw_ec_pharmacies_cleaned_)\d{4}-\d{2}-\d{2}(\.xlsx)",
+        r"\g<1>" + as_of + r"\g<2>",
+        text,
+    )
+    text = re.sub(
+        r"(mhlw_ec_pharmacies_cleaned_)\d{4}-\d{2}-\d{2}(\.csv)",
+        r"\g<1>" + as_of + r"\g<2>",
+        text,
+    )
+    text = re.sub(
+        r"(data_)\d{4}-\d{2}-\d{2}(\.json)",
+        r"\g<1>" + as_of + r"\g<2>",
+        text,
+    )
+
+    if text != orig:
+        readme.write_text(text, encoding="utf-8")
+        return True
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     repo_root = Path(__file__).resolve().parents[1]
     data_dir = repo_root / "data"
@@ -388,6 +432,9 @@ def main(argv: list[str] | None = None) -> int:
         line_dir.mkdir(parents=True, exist_ok=True)
         (docs_dir / "data.json").write_text(existing_json.read_text(encoding="utf-8"), encoding="utf-8")
         (line_dir / "data.json").write_text(existing_json.read_text(encoding="utf-8"), encoding="utf-8")
+
+        if update_readme_as_of(repo_root, as_of):
+            print("Updated README.md (as-of):", as_of)
         print(f"No update needed: data_{as_of}.json already exists and looks valid.")
         return 0
 
@@ -568,6 +615,9 @@ def main(argv: list[str] | None = None) -> int:
 
     (docs_dir / "data.json").write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
     (line_dir / "data.json").write_text(out_json.read_text(encoding="utf-8"), encoding="utf-8")
+
+    if update_readme_as_of(repo_root, as_of):
+        print("Updated README.md (as-of):", as_of)
 
     print("Updated to:", as_of)
     print("XLSX:", xlsx_url)

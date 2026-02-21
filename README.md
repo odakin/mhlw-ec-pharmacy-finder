@@ -4,7 +4,7 @@
 検索しやすい **CSV / XLSX / JSON** に整形し、さらに **静的Web検索（GitHub Pages）** と **LINE Botサンプル** を添えたものです。
 
 - 出典（公式ページ）: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
-- 最新取り込みデータ時点: 2026-01-31
+- 最新取り込みデータ時点: 2026-02-20
 - 生成物:
   - `data/` : 整形済みデータ（CSV/XLSX/JSON、原本XLSXも保存）
   - `docs/` : 静的Web検索（GitHub Pages用）
@@ -45,9 +45,9 @@ python -m http.server 8000
 
 ## 2) 整形済みデータ
 
-- `data/mhlw_ec_pharmacies_cleaned_2026-01-31.xlsx`
-- `data/mhlw_ec_pharmacies_cleaned_2026-01-31.csv`（UTF-8 BOM）
-- `data/data_2026-01-31.json`（Web/LINE Bot用）
+- `data/mhlw_ec_pharmacies_cleaned_2026-02-20.xlsx`
+- `data/mhlw_ec_pharmacies_cleaned_2026-02-20.csv`（UTF-8 BOM）
+- `data/data_2026-02-20.json`（Web/LINE Bot用）
 
 追加した列（例）:
 - `市区町村_推定`：住所文字列から市区町村相当を推定（完璧ではありません）
@@ -58,7 +58,7 @@ python -m http.server 8000
 Web UI の絞り込み:
 - 事前連絡「要」を除く
 - 時間外対応あり
-- 女性薬剤師がいる / 男性薬剤師がいる（※性別フィルタは OR：どちらかに該当すれば表示）
+- 女性薬剤師がいる
 
 ---
 

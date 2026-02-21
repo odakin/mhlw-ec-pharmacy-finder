@@ -217,7 +217,6 @@ function doSearch(resetLimit = true) {
   const onlyNotCallAhead = el("onlyNotCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
-  const hasMale = el("hasMale").checked;
 
   const terms = q ? q.split(" ").filter(Boolean) : [];
 
@@ -229,12 +228,10 @@ function doSearch(resetLimit = true) {
 
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
 
-    // Gender filters are OR (multi-select). If none selected, do not filter.
-    if (hasFemale || hasMale) {
+    // Optional filter: show only rows with at least one female pharmacist.
+    if (hasFemale) {
       const f = toInt(r.pharmacistsFemale);
-      const m = toInt(r.pharmacistsMale);
-      const ok = (hasFemale && f > 0) || (hasMale && m > 0);
-      if (!ok) return false;
+      if (!(f > 0)) return false;
     }
 
     if (!terms.length) return true;
@@ -356,7 +353,6 @@ document.addEventListener("DOMContentLoaded", () => {
     el("onlyNotCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
     el("hasFemale").checked = false;
-    el("hasMale").checked = false;
     doSearch(true);
   });
   el("q").addEventListener("keydown", (ev) => {
@@ -366,5 +362,4 @@ document.addEventListener("DOMContentLoaded", () => {
   el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
   el("hasFemale").addEventListener("change", () => doSearch(true));
-  el("hasMale").addEventListener("change", () => doSearch(true));
 });
