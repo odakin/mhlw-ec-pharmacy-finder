@@ -166,6 +166,8 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
     const hasPharmacists = (pf + pm + pn) > 0;
     const url = (r.url || "").toString().trim();
     const urlLink = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">公式/店舗ページ</a>` : "";
+    const gmapQuery = encodeURIComponent((r.name || "") + " " + (r.addr || ""));
+    const gmapLink = `<a href="https://www.google.com/maps/search/?api=1&query=${gmapQuery}" target="_blank" rel="noopener">Google Mapで見る</a>`;
 
     li.innerHTML = `
       <div class="card">
@@ -182,6 +184,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
           ${telLink ? `<span>📞 ${telLink}</span>` : ``}
           ${afterTelLink ? `<span>🌙 時間外 ${afterTelLink}</span>` : ``}
           ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
+          <span>📍 ${gmapLink}</span>
         </div>
         ${hours ? `<div class="detail"><span class="k">開局等時間</span> ${hours}</div>` : ``}
         ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
