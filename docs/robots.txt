@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /data.json
+
+Sitemap: https://odakin.github.io/mhlw-ec-pharmacy-finder/sitemap.xml
