@@ -94,12 +94,27 @@
     </section>
 
     <section class="results">
-      <p id="status">データ読み込み中…</p>
+      <div class="results-toolbar">
+        <p id="status">データ読み込み中…</p>
+        <div class="results-actions">
+          <button id="btnNearby" type="button" class="ghost small">📍 近い順</button>
+          <div class="view-toggle">
+            <button id="btnViewList" type="button" class="active">リスト</button>
+            <button id="btnViewMap" type="button">地図</button>
+          </div>
+        </div>
+      </div>
       <noscript>
         <p>このツールはJavaScriptを使用しています。ブラウザのJavaScriptを有効にしてください。</p>
         <p>緊急避妊薬（アフターピル・レボノルゲストレル）を処方箋なしで購入できる薬局を、厚生労働省の公式データから都道府県・市区町村・薬局名で検索できます。全国10,000件以上の薬局が登録されています。</p>
       </noscript>
-      <ol id="list"></ol>
+      <div id="listSection">
+        <ol id="list"></ol>
+      </div>
+      <section id="mapSection" style="display:none;">
+        <p id="mapGuide" class="small"></p>
+        <div id="mapContainer"></div>
+      </section>
     </section>
   </main>
 
