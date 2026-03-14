@@ -14,7 +14,7 @@ button { padding: 10px 14px; border-radius: 8px; border: 1px solid #111; backgro
 button.ghost { background: transparent; color: #111; }
 button:hover { opacity: 0.9; }
 .small { font-size: 0.85rem; color: #333; }
-.results { padding-top: 10px; }
+.results { padding-top: 10px; min-height: 600px; }
 ol { padding-left: 0; list-style: none; margin: 0; }
 li { margin: 10px 0; }
 .card { background: white; border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
