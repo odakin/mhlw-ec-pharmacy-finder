@@ -669,7 +669,13 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
       : "";
 
     // Hours (Feature 3)
+    const hoursInfo = getHoursInfo(r.hours);
     const hoursHtml = renderHoursHtml(r.hours);
+    // After-hours notice: show prominently when pharmacy is closed and has after-hours support
+    const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
+    const afterHoursNote = (isClosed && afterHoursFlag)
+      ? `<div class="after-hours-note">🌙 時間外対応あり${showAfterTel ? ` — 📞 ${afterTelLink}` : (tel ? ` — 📞 ${telLink}` : ``)}</div>`
+      : "";
 
     li.innerHTML = `
       <div class="card">
@@ -689,6 +695,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
           <span>📍 ${gmapLink}</span>
         </div>
         ${hoursHtml}
+        ${afterHoursNote}
         ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
         ${privacy ? `<div class="detail"><span class="k">プライバシー</span> ${privacy}</div>` : ``}
         ${notes ? `<div class="detail"><span class="k">備考</span> ${notes}</div>` : ``}
