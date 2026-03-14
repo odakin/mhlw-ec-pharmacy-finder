@@ -6,10 +6,11 @@
 - 出典（公式ページ）: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
 - 最新取り込みデータ時点: 2026-03-10
 - 生成物:
-  - `data/` : 整形済みデータ（CSV/XLSX/JSON、原本XLSXも保存）
-  - `docs/` : 静的Web検索（GitHub Pages用）
+  - `data/` : 整形済みデータ（CSV/XLSX/JSON、原本XLSX、ジオコーディングキャッシュ）
+  - `docs/` : 静的Web検索（GitHub Pages用、地図・営業時間表示対応）
   - `line_bot/` : LINE Bot（Node.js最小サンプル）
   - `scripts/update_data.py` : 公式ページから最新データを取り込み直す更新スクリプト
+  - `scripts/geocode.py` : 住所→緯度経度変換（東大CSIS API）
 
 ---
 
@@ -60,6 +61,12 @@ Web UI の絞り込み:
 - 時間外対応あり
 - 女性薬剤師がいる
 
+Web UI の機能:
+- **地図表示**: Leaflet.js + OpenStreetMap で検索結果をピン表示（マーカークラスタリング対応）
+- **近い順ソート**: ブラウザの位置情報から現在地を取得し、距離順にソート
+- **営業時間表示**: 今日の営業状況（営業中/営業時間外/休み）をハイライト + 全曜日スケジュール折りたたみ表示
+- **Google Mapリンク**: 各薬局カードから Google Map へ直接遷移（写真・口コミ・ナビ）
+
 ---
 
 ## 3) LINE Bot（Node.jsサンプル）
@@ -94,6 +101,20 @@ python scripts/update_data.py
 更新が入ると、次が作られます:
 - `data/` に日付付きの CSV/XLSX/JSON
 - `docs/data.json` と `line_bot/data.json` が最新に差し替え
+
+### ジオコーディング（地図機能用）
+
+データ更新後、新規/住所変更分の緯度経度を取得します:
+
+```bash
+python3 scripts/geocode.py            # 未取得分のみ処理
+python3 scripts/geocode.py --limit 100  # 最大100件
+python3 scripts/geocode.py --force      # 全件再取得
+```
+
+- 東大CSIS Simple Geocoding API（無料・APIキー不要・番地レベル精度）を使用
+- キャッシュ: `data/geocode_cache.json`（append-only、削除された薬局のデータも保持）
+- 0.5秒間隔。初回約85分、以降の更新は新規分のみ数秒〜数分
 
 ---
 
