@@ -83,9 +83,11 @@ git config core.hooksPath scripts/hooks
 
 ### ジオコーディング運用
 
-- `python3 scripts/geocode.py` で差分更新（新規/住所変更分のみ）
+- GitHub Actions で日次自動実行（データ更新後に `geocode.py --limit 500`）
+- 東大CSISダウン時は `continue-on-error` でスキップ、翌日自動リトライ（キャッシュにないIDのみ処理する設計）
+- 手動実行も可能: `python3 scripts/geocode.py`（差分更新）/ `--force`（全件再取得）
 - 0.5秒間隔。初回 ~85分、以降は数秒〜数分
-- 完了後 `data/geocode_cache.json` → `docs/geocode_cache.json` にコピーしてコミット
+- キャッシュ: `data/geocode_cache.json` → `docs/geocode_cache.json` にコピー
 
 ## SESSION.md ルール（全プロジェクト共通）
 

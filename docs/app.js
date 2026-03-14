@@ -790,7 +790,7 @@ function doSearch(resetLimit = true) {
     renderResults([], RESULTS_STEP, false);
     CURRENT_ROWS = [];
     if (pref && PENDING_PREFS.has(pref)) {
-      el("status").textContent = `${pref} は現在調整中のため、公式リストに個別の薬局等が掲載されていません。`;
+      el("status").textContent = `${pref} は現在調整中のため、公式リストに個別の薬局が掲載されていません。`;
     } else {
       el("status").textContent = "該当なし。条件を変えてみてください。";
     }
@@ -877,7 +877,7 @@ async function init() {
     restoreStateFromUrl();
     doSearch(true);
     if (!el("prefSelect").value && !el("q").value) {
-      el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局等データを読み込みました。条件を入れて検索できます。`;
+      el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局データを読み込みました。条件を入れて検索できます。`;
     }
   } catch (e) {
     console.error(e);
