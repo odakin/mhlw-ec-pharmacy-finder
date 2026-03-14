@@ -10,12 +10,19 @@
 ## リポジトリ構成
 
 ```
-docs/           → GitHub Pages 公開ディレクトリ（HTML/JS/CSS/data.json）
-data/           → 元データ（厚労省の生XLSX、加工済みCSV/XLSX/JSON）
-scripts/        → データ更新スクリプト（Python）
-line_bot/       → LINE Bot サンプル
-AGENTS.md       → コードレビューガイドライン
-GPT_INSTRUCTIONS.md → GPT向けの対話指示（参考用）
+docs/                    → GitHub Pages 公開ディレクトリ
+  index.html / app.js / style.css  → フロントエンド（バニラJS）
+  data.json              → 薬局データ（10,128件）
+  geocode_cache.json     → ジオコーディング結果（フロントエンド配信用コピー）
+data/                    → 元データ・キャッシュ
+  *.xlsx / *.csv / *.json → 厚労省データ加工済み
+  geocode_cache.json     → ジオコーディング結果（マスター）
+scripts/
+  update_data.py         → 公式ページからデータ更新
+  geocode.py             → 東大CSIS APIでジオコーディング（住所→緯度経度）
+line_bot/                → LINE Bot サンプル
+AGENTS.md                → コードレビューガイドライン
+FEATURE_SPEC.md          → 機能仕様書（4機能の要件・技術方針）
 ```
 
 ## データ構造（docs/data.json）
@@ -46,7 +53,7 @@ GPT_INSTRUCTIONS.md → GPT向けの対話指示（参考用）
 }
 ```
 
-**重要**: 緯度経度のカラムは存在しない。地図機能には別途ジオコーディングが必要。
+**注**: 緯度経度は `data.json` には含まれない。`geocode_cache.json`（`{ "id": {"lat", "lng", "lvl", "addr"}, ... }`）を地図表示時に別途 fetch する設計。
 
 ## 開発ルール
 
@@ -54,18 +61,20 @@ GPT_INSTRUCTIONS.md → GPT向けの対話指示（参考用）
 - `docs/` 配下が本番。変更はここに反映する
 - 厚労省サーバーへの頻繁なアクセスは避ける
 
-## やること
+## 実装済み機能（FEATURE_SPEC.md 参照）
 
-**FEATURE_SPEC.md** を読んで、記載された4機能を実装する。
+4機能すべて実装・プッシュ済み:
 
-実装の優先順位（FEATURE_SPEC.md の「実装の優先順位」セクション参照）:
+1. **機能4**: Google Mapリンク — 各薬局カードに「📍 Google Mapで見る」リンク（コミット d83b795）
+2. **機能1**: 地図表示 — Leaflet.js + OpenStreetMap + markercluster。東大CSISでジオコーディング（コミット 514ad56, 3c3c685）
+3. **機能2**: 近い順ソート — Geolocation API + Haversine距離計算（コミット 3c3c685）
+4. **機能3**: 営業時間表示 — 曜日別パーサー（89.4%カバー率）+ 今日ハイライト + 折りたたみ全曜日表示（コミット 3c3c685）
 
-1. **機能4**: Google Mapリンク追加（最も簡単、すぐ効果がある）
-2. **機能1**: Leaflet.js 地図表示（要ジオコーディング。緯度経度データは存在しないので、ジオコーディングスクリプトの作成から）
-3. **機能2**: 現在地から近い順ソート（機能1の緯度経度データに依存）
-4. **機能3**: 営業中リアルタイム表示（`hours` フィールドのパース）
+### ジオコーディング運用
 
-詳細な要件・技術方針・注意事項はすべて FEATURE_SPEC.md に書いてある。
+- `python3 scripts/geocode.py` で差分更新（新規/住所変更分のみ）
+- 0.5秒間隔。初回 ~85分、以降は数秒〜数分
+- 完了後 `data/geocode_cache.json` → `docs/geocode_cache.json` にコピーしてコミット
 
 ## SESSION.md ルール（全プロジェクト共通）
 
