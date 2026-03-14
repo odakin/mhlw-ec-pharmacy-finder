@@ -102,6 +102,20 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 .after-hours-note a { color: #0b57d0; text-decoration: none; }
 .after-hours-note a:hover { text-decoration: underline; }
 
+/* FAQ section */
+.faq-section { max-width: 980px; margin: 0 auto; padding: 16px; }
+.faq-section h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.faq-section details { margin-bottom: 6px; border: 1px solid #ddd; border-radius: 8px; background: white; }
+.faq-section summary { padding: 10px 12px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.faq-section p { margin: 0; padding: 0 12px 10px; font-size: 0.85rem; color: #333; }
+
+/* Prefecture nav */
+.pref-nav { max-width: 980px; margin: 0 auto; padding: 16px; }
+.pref-nav h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.pref-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.pref-links a { display: inline-block; padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: white; color: #0b57d0; text-decoration: none; font-size: 0.85rem; }
+.pref-links a:hover { border-color: #0b57d0; background: #f0f4ff; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .highlights { grid-template-columns: repeat(2, 1fr); }
