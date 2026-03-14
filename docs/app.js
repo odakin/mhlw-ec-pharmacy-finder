@@ -928,6 +928,21 @@ document.addEventListener("DOMContentLoaded", () => {
     switchView("map");
   });
 
+  // Highlight cards as shortcuts
+  const hiMap = el("hiMap");
+  if (hiMap) hiMap.addEventListener("click", async () => {
+    await loadMapLibs();
+    switchView("map");
+    if (!USER_POS) confirmAndRequestLocation();
+  });
+  const hiFemale = el("hiFemale");
+  if (hiFemale) hiFemale.addEventListener("click", () => {
+    const cb = el("hasFemale");
+    cb.checked = !cb.checked;
+    doSearch(true);
+    cb.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
   // URL back/forward navigation
   window.addEventListener("popstate", () => {
     restoreStateFromUrl();
