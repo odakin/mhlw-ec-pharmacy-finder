@@ -43,6 +43,11 @@ jobs:
         run: |
           python scripts/update_data.py
 
+      - name: Geocode new/changed pharmacies
+        run: |
+          python scripts/geocode.py --limit 500
+        continue-on-error: true
+
       - name: Validate docs/data.json (strict JSON)
         run: |
           node -e "JSON.parse(require('fs').readFileSync('docs/data.json','utf8'))"
