@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.parse
@@ -50,8 +51,8 @@ def save_cache(cache: dict) -> None:
         json.dump(cache, f, ensure_ascii=False, separators=(",", ":"))
 
 
-def geocode_one(addr: str) -> dict | None:
-    """Call CSIS geocoder. Returns {"lat", "lng", "lvl"} or None on failure."""
+def _call_csis(addr: str) -> dict | None:
+    """Single CSIS API call. Returns {"lat", "lng", "lvl"} or None."""
     params = urllib.parse.urlencode({"charset": "UTF8", "addr": addr})
     url = f"{CSIS_URL}?{params}"
     headers = {"User-Agent": "mhlw-ec-pharmacy-finder/1.0 (geocode script)"}
@@ -73,6 +74,61 @@ def geocode_one(addr: str) -> dict | None:
             }
     except Exception as e:
         print(f"  ERROR: {e}", file=sys.stderr)
+    return None
+
+
+def _clean_addr(addr: str) -> list[str]:
+    """Generate progressively simplified addresses for fallback geocoding.
+
+    Returns a list of cleaned addresses to try (most specific first).
+    The original address is NOT included (caller tries it first).
+    """
+    candidates = []
+
+    # 1. Remove building/floor info: everything after common suffixes
+    #    e.g. "...17号M&Cビル1階" -> "...17号"
+    cleaned = re.sub(
+        r'[A-Za-z０-９&＆].{0,30}$'
+        r'|[0-9０-９]*[FＦ階]$'
+        r'|[ー\-][0-9０-９]*[FＦ階].*$',
+        '', addr
+    ).strip()
+    if cleaned and cleaned != addr:
+        candidates.append(cleaned)
+
+    # 2. Remove trailing non-address parts (ビル, マンション, etc.)
+    cleaned2 = re.sub(
+        r'[^\d丁目番号]+(?:ビル|マンション|ハイツ|コーポ|アパート|タワー|プラザ|'
+        r'センター|会館|薬局|店舗|テナント).*$',
+        '', addr
+    ).strip()
+    if cleaned2 and cleaned2 != addr and cleaned2 not in candidates:
+        candidates.append(cleaned2)
+
+    return candidates
+
+
+def geocode_one(addr: str) -> dict | None:
+    """Call CSIS geocoder with automatic address cleaning fallback.
+
+    Tries the original address first. On failure, tries progressively
+    cleaned versions (building names removed, etc.).
+    Returns {"lat", "lng", "lvl"} or None on failure.
+    """
+    result = _call_csis(addr)
+    if result:
+        return result
+
+    # Try cleaned addresses as fallback
+    for cleaned in _clean_addr(addr):
+        time.sleep(DELAY)
+        print(f"  retry: {cleaned[:40]}...", end=" ")
+        result = _call_csis(cleaned)
+        if result:
+            print(f"OK (lvl={result['lvl']})")
+            return result
+        print("FAIL")
+
     return None
 
 
