@@ -588,11 +588,13 @@ function updateMap(rows) {
     }
   }
 
-  // Guide for large results
+  // Guide for large results (only when no prefecture is selected and not in nearby mode)
   const guide = el("mapGuide");
   if (guide) {
-    guide.textContent = rows.length > 200
-      ? `${rows.length.toLocaleString()} 件表示中。検索条件を絞ると地図が見やすくなります。`
+    const prefSelected = el("prefSelect") && el("prefSelect").value;
+    const showTip = rows.length > 200 && !SORT_BY_DIST && !prefSelected;
+    guide.textContent = showTip
+      ? `${rows.length.toLocaleString()} 件表示中。都道府県を選ぶと地図が見やすくなります。`
       : "";
   }
 }
