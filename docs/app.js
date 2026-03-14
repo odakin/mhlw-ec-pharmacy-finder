@@ -931,6 +931,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Highlight cards as shortcuts
+  const hiAll = el("hiAll");
+  if (hiAll) hiAll.addEventListener("click", () => {
+    el("btnClear").click();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   const hiMap = el("hiMap");
   if (hiMap) hiMap.addEventListener("click", async () => {
     await loadMapLibs();
