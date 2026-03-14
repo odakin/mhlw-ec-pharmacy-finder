@@ -130,6 +130,12 @@
 - リッチリザルトテスト: 4件すべて有効（FAQ/Dataset/BreadcrumbList/WebApplication）
 - 検索パフォーマンス・Core Web Vitals: データ蓄積中（後日確認）
 
+### タイトル・概要文の調整
+
+- タイトル（title, og:title, twitter:title, JSON-LD, h1, BASE_TITLE, LINE Bot）から「（非公式）」を削除
+- 概要文の「必ず」を削除（「最終確認は公式情報と…」に）
+- 免責の「非公式ツール」はそのまま残す
+
 ### 残タスク
 
 - [ ] 全機能のライブサイトテスト（近い順は位置情報が必要）

@@ -737,7 +737,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
 // ── Search ──
 
-const BASE_TITLE = "緊急避妊薬 販売可能な薬局等 検索（非公式）";
+const BASE_TITLE = "緊急避妊薬 販売可能な薬局等 検索";
 
 function syncUrlFromState() {
   const params = new URLSearchParams();
