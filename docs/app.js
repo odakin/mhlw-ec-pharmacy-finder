@@ -522,7 +522,7 @@ function loadScript(src) {
 
 async function loadGeoCache() {
   try {
-    const resp = await fetch("geocode_cache.json", { cache: "no-cache" });
+    const resp = await fetch("geocode_cache.json");
     GEO_CACHE = await resp.json();
   } catch (e) {
     console.warn("geocode_cache.json not available:", e);
@@ -717,6 +717,37 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
 // ── Search ──
 
+const BASE_TITLE = "緊急避妊薬 販売可能な薬局等 検索（非公式）";
+
+function syncUrlFromState() {
+  const params = new URLSearchParams();
+  const pref = el("prefSelect").value;
+  const q = el("q").value.trim();
+  if (pref) params.set("pref", pref);
+  if (q) params.set("q", q);
+  if (el("hasFemale").checked) params.set("female", "1");
+  if (el("onlyNotCallAhead").checked) params.set("nocall", "1");
+  if (el("onlyAfterHours").checked) params.set("after", "1");
+  const qs = params.toString();
+  const url = qs ? "?" + qs : location.pathname;
+  if (location.search !== (qs ? "?" + qs : "")) {
+    history.pushState(null, "", url);
+  }
+  // Update page title for SEO & browser tab
+  document.title = pref ? `${pref}の緊急避妊薬 薬局一覧 — ${BASE_TITLE}` : BASE_TITLE;
+}
+
+function restoreStateFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const pref = params.get("pref") || "";
+  const q = params.get("q") || "";
+  el("prefSelect").value = pref;
+  el("q").value = q;
+  el("hasFemale").checked = params.get("female") === "1";
+  el("onlyNotCallAhead").checked = params.get("nocall") === "1";
+  el("onlyAfterHours").checked = params.get("after") === "1";
+}
+
 function doSearch(resetLimit = true) {
   const pref = cleanValue(el("prefSelect").value);
   const q = normalizeText(el("q").value);
@@ -724,6 +755,7 @@ function doSearch(resetLimit = true) {
   const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
   const terms = q ? q.split(" ").filter(Boolean) : [];
+  syncUrlFromState();
 
   const rows = DATA.filter((r) => {
     if (pref && r.pref !== pref) return false;
@@ -787,7 +819,7 @@ function fillPrefOptions() {
 async function init() {
   try {
     const [dataResp] = await Promise.all([
-      fetch("data.json", { cache: "no-cache" }),
+      fetch("data.json"),
       loadGeoCache(),
     ]);
     const json = await dataResp.json();
@@ -822,8 +854,11 @@ async function init() {
     a.textContent = "厚生労働省（公式）";
 
     fillPrefOptions();
-    renderResults(DATA.slice(0, RESULTS_STEP), RESULTS_STEP, false);
-    el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局等データを読み込みました。条件を入れて検索できます。`;
+    restoreStateFromUrl();
+    doSearch(true);
+    if (!el("prefSelect").value && !el("q").value) {
+      el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局等データを読み込みました。条件を入れて検索できます。`;
+    }
   } catch (e) {
     console.error(e);
     el("status").textContent = "データの読み込みに失敗しました。";
@@ -873,5 +908,11 @@ document.addEventListener("DOMContentLoaded", () => {
   el("btnViewMap").addEventListener("click", async () => {
     await loadMapLibs();
     switchView("map");
+  });
+
+  // URL back/forward navigation
+  window.addEventListener("popstate", () => {
+    restoreStateFromUrl();
+    doSearch(true);
   });
 });

@@ -8,6 +8,7 @@
   <meta name="keywords" content="緊急避妊薬,アフターピル,薬局検索,OTC,要指導医薬品,厚生労働省">
   <meta name="theme-color" content="#0b57d0">
   <link rel="canonical" href="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
+  <link rel="alternate" hreflang="ja" href="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💊</text></svg>">
   <!-- Preconnect hints for map resources -->
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
@@ -114,6 +115,33 @@
     }
   }
   </script>
+  <!-- BreadcrumbList 構造化データ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "厚生労働省",
+        "item": "https://www.mhlw.go.jp/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "緊急避妊薬の販売について",
+        "item": "https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "薬局検索（非公式）",
+        "item": "https://odakin.github.io/mhlw-ec-pharmacy-finder/"
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <header>
@@ -197,7 +225,17 @@
       </div>
       <noscript>
         <p>このツールはJavaScriptを使用しています。ブラウザのJavaScriptを有効にしてください。</p>
-        <p>緊急避妊薬（アフターピル・レボノルゲストレル）を処方箋なしで購入できる薬局を、厚生労働省の公式データから都道府県・市区町村・薬局名で検索できます。全国10,000件以上の薬局が登録されています。</p>
+        <h2>緊急避妊薬（アフターピル）を買える薬局を探す</h2>
+        <p>緊急避妊薬（レボノルゲストレル）は、2024年11月から要指導医薬品として処方箋なしで薬局の店頭で購入できるようになりました。このサイトでは、厚生労働省が公表する全国10,000件以上の販売可能薬局を、都道府県・市区町村・薬局名で検索できます。</p>
+        <h3>主な機能</h3>
+        <ul>
+          <li>都道府県・地名・薬局名で全国の薬局を検索</li>
+          <li>現在地から近い順にソート（地図表示対応）</li>
+          <li>女性薬剤師がいる薬局で絞り込み</li>
+          <li>営業時間・事前連絡の要否を確認</li>
+        </ul>
+        <h3>都道府県から探す</h3>
+        <p>北海道 / 青森県 / 岩手県 / 宮城県 / 秋田県 / 山形県 / 福島県 / 茨城県 / 栃木県 / 群馬県 / 埼玉県 / 千葉県 / 東京都 / 神奈川県 / 新潟県 / 富山県 / 石川県 / 福井県 / 山梨県 / 長野県 / 岐阜県 / 静岡県 / 愛知県 / 三重県 / 滋賀県 / 京都府 / 大阪府 / 兵庫県 / 奈良県 / 和歌山県 / 鳥取県 / 島根県 / 岡山県 / 広島県 / 山口県 / 徳島県 / 香川県 / 愛媛県 / 高知県 / 福岡県 / 佐賀県 / 長崎県 / 熊本県 / 大分県 / 宮崎県 / 鹿児島県 / 沖縄県</p>
       </noscript>
       <div id="listSection">
         <ol id="list"></ol>
