@@ -1,0 +1,15 @@
+#!/bin/sh
+# Warn if docs/ files are staged but SESSION.md is not
+
+DOCS_CHANGED=$(git diff --cached --name-only -- docs/ | head -1)
+SESSION_CHANGED=$(git diff --cached --name-only -- SESSION.md | head -1)
+
+if [ -n "$DOCS_CHANGED" ] && [ -z "$SESSION_CHANGED" ]; then
+  echo ""
+  echo "⚠️  docs/ が変更されていますが SESSION.md が含まれていません。"
+  echo "   SESSION.md の更新を忘れていませんか？"
+  echo ""
+  echo "   このまま続けるには: git commit --no-verify"
+  echo ""
+  exit 1
+fi
