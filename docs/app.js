@@ -574,7 +574,18 @@ function updateMap(rows) {
   if (USER_POS) bounds.push([USER_POS.lat, USER_POS.lng]);
 
   if (bounds.length) {
-    MAP.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    // When sorting by distance, zoom to nearby area instead of all results
+    if (SORT_BY_DIST && USER_POS && bounds.length > 5) {
+      // Use user position + nearest ~5 results for a useful zoom level
+      const nearBounds = bounds
+        .map(b => ({ b, d: haversine(USER_POS.lat, USER_POS.lng, b[0], b[1]) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 5)
+        .map(x => x.b);
+      MAP.fitBounds(nearBounds, { padding: [30, 30], maxZoom: 15 });
+    } else {
+      MAP.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
   }
 
   // Guide for large results
