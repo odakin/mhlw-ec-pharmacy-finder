@@ -407,15 +407,57 @@ function computeDistances() {
   }
 }
 
-function requestLocation() {
+function confirmAndRequestLocation() {
   const btn = el("btnNearby");
   if (!navigator.geolocation) {
     btn.textContent = "位置情報非対応";
     btn.disabled = true;
     return;
   }
-  btn.textContent = "取得中…";
-  btn.disabled = true;
+
+  // If already acquired, toggle sort
+  if (USER_POS) {
+    SORT_BY_DIST = !SORT_BY_DIST;
+    btn.classList.toggle("active", SORT_BY_DIST);
+    btn.textContent = SORT_BY_DIST ? "📍 近い順 ✓" : "📍 近い順";
+    doSearch(true);
+    return;
+  }
+
+  // Show inline privacy panel on first click
+  const existing = document.getElementById("nearbyPanel");
+  if (existing) { existing.remove(); return; } // toggle off if already open
+
+  const panel = document.createElement("div");
+  panel.id = "nearbyPanel";
+  panel.className = "nearby-panel";
+  panel.innerHTML =
+    '<p class="nearby-panel-text">' +
+      '現在地から近い薬局を探すために、ブラウザの位置情報機能を使用します。' +
+    '</p>' +
+    '<ul class="nearby-panel-list">' +
+      '<li>位置情報はお使いの<strong>ブラウザ内だけ</strong>で使います</li>' +
+      '<li>記録や外部への送信は<strong>一切しません</strong></li>' +
+    '</ul>' +
+    '<p class="nearby-panel-text">この後、ブラウザから位置情報の許可を求められます。</p>' +
+    '<div class="nearby-panel-actions">' +
+      '<button type="button" id="nearbyConfirm">位置情報を使って近い順に並べる</button>' +
+      '<button type="button" id="nearbyCancel" class="ghost">やめる</button>' +
+    '</div>';
+
+  // Insert panel after the results toolbar
+  btn.closest(".results-actions").after(panel);
+
+  document.getElementById("nearbyCancel").addEventListener("click", () => panel.remove());
+  document.getElementById("nearbyConfirm").addEventListener("click", () => {
+    panel.remove();
+    btn.textContent = "取得中…";
+    btn.disabled = true;
+    requestGeolocation(btn);
+  });
+}
+
+function requestGeolocation(btn) {
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       USER_POS = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -773,6 +815,8 @@ async function init() {
     DATA = real;
 
     el("asOf").textContent = META.asOf || "-";
+    const hiCount = el("hiCount");
+    if (hiCount) hiCount.textContent = DATA.length.toLocaleString() + " 件";
     const a = el("sourceLink");
     a.href = META.sourcePage || "#";
     a.textContent = "厚生労働省（公式）";
@@ -820,7 +864,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el("btnNearby").textContent = "📍 近い順 ✓";
       doSearch(true);
     } else {
-      requestLocation();
+      confirmAndRequestLocation();
     }
   });
 

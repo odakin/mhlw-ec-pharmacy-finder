@@ -6,7 +6,12 @@
   <title>緊急避妊薬 販売可能な薬局等 検索（非公式）</title>
   <meta name="description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。都道府県・地名・薬局名で全国10,000件以上の薬局を検索できます。">
   <meta name="keywords" content="緊急避妊薬,アフターピル,薬局検索,OTC,要指導医薬品,厚生労働省">
+  <meta name="theme-color" content="#0b57d0">
   <link rel="canonical" href="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💊</text></svg>">
+  <!-- Preconnect hints for map resources -->
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="緊急避妊薬 販売可能な薬局等 検索（非公式）">
@@ -14,10 +19,14 @@
   <meta property="og:url" content="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
   <meta property="og:locale" content="ja_JP">
   <meta property="og:site_name" content="緊急避妊薬 薬局検索">
+  <meta property="og:image" content="https://odakin.github.io/mhlw-ec-pharmacy-finder/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="緊急避妊薬 販売可能な薬局等 検索（非公式）">
   <meta name="twitter:description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。全国10,000件以上を検索。">
+  <meta name="twitter:image" content="https://odakin.github.io/mhlw-ec-pharmacy-finder/og-image.png">
   <link rel="stylesheet" href="style.css">
   <!-- JSON-LD 構造化データ -->
   <script type="application/ld+json">
@@ -43,6 +52,68 @@
     }
   }
   </script>
+  <!-- FAQ 構造化データ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "緊急避妊薬（アフターピル）はどこで買えますか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "厚生労働省が公表する全国10,000件以上の薬局で、処方箋なしで購入できます。このサイトでは都道府県・地名・薬局名から販売可能な薬局を検索できます。在庫や薬剤師の勤務状況は変動するため、来局前に電話確認が推奨されています。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "緊急避妊薬の購入に処方箋は必要ですか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "要指導医薬品として、処方箋なしで薬局の店頭で購入できます。ただし、薬剤師による対面での情報提供と確認が必要です。販売可能な薬局の一覧は厚生労働省が公表しています。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "女性の薬剤師がいる薬局を探せますか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "はい。厚生労働省の公式データには販売可能な薬剤師の性別（人数）が含まれており、このサイトでは「女性薬剤師がいる」フィルターで絞り込むことができます。ただし勤務状況は変動するため、来局前にご確認ください。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "事前に電話予約は必要ですか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "薬局によります。事前連絡が「要」の薬局と不要の薬局があります。このサイトの「事前連絡『要』を除く」フィルターで、予約なしで来局できる薬局を絞り込めます。"
+        }
+      }
+    ]
+  }
+  </script>
+  <!-- Dataset 構造化データ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Dataset",
+    "name": "緊急避妊薬の販売が可能な薬局等の一覧",
+    "description": "厚生労働省が公表する、要指導医薬品である緊急避妊薬（レボノルゲストレル）の販売が可能な薬局等の一覧データ。薬局名・住所・電話番号・営業時間・販売可能薬剤師の性別人数等を含む。",
+    "url": "https://odakin.github.io/mhlw-ec-pharmacy-finder/",
+    "license": "https://www.mhlw.go.jp/chosakuken/index.html",
+    "creator": {
+      "@type": "Organization",
+      "name": "厚生労働省",
+      "url": "https://www.mhlw.go.jp/"
+    },
+    "distribution": {
+      "@type": "DataDownload",
+      "encodingFormat": "application/json",
+      "contentUrl": "https://odakin.github.io/mhlw-ec-pharmacy-finder/data.json"
+    }
+  }
+  </script>
 </head>
 <body>
   <header>
@@ -58,6 +129,25 @@
   </header>
 
   <main>
+    <section class="highlights" aria-label="このサイトの特長">
+      <div class="hi-item">
+        <span class="hi-num" id="hiCount">10,000+</span>
+        <span class="hi-label">全国の薬局を網羅<br><span class="hi-sub">厚労省公式データ全件収録</span></span>
+      </div>
+      <div class="hi-item">
+        <span class="hi-icon" aria-hidden="true">📍</span>
+        <span class="hi-label">地図&近い順で探せる<br><span class="hi-sub">現在地から距離順にソート</span></span>
+      </div>
+      <div class="hi-item">
+        <span class="hi-icon" aria-hidden="true">👩‍⚕️</span>
+        <span class="hi-label">女性薬剤師で絞り込み<br><span class="hi-sub">性別人数を公式データから表示</span></span>
+      </div>
+      <div class="hi-item">
+        <span class="hi-icon" aria-hidden="true">✅</span>
+        <span class="hi-label">無料・登録不要<br><span class="hi-sub">広告なし・すぐ使える</span></span>
+      </div>
+    </section>
+
     <section class="controls">
       <div class="row">
         <label>
@@ -98,6 +188,7 @@
         <p id="status">データ読み込み中…</p>
         <div class="results-actions">
           <button id="btnNearby" type="button" class="ghost small">📍 近い順</button>
+          <span class="nearby-notice">※位置情報の記録や送信は一切行いません</span>
           <div class="view-toggle">
             <button id="btnViewList" type="button" class="active">リスト</button>
             <button id="btnViewMap" type="button">地図</button>
