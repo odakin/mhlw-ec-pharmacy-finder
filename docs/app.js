@@ -447,6 +447,7 @@ function confirmAndRequestLocation() {
 
   // Insert panel after the results toolbar
   btn.closest(".results-actions").after(panel);
+  panel.scrollIntoView({ behavior: "smooth", block: "center" });
 
   document.getElementById("nearbyCancel").addEventListener("click", () => panel.remove());
   document.getElementById("nearbyConfirm").addEventListener("click", () => {
