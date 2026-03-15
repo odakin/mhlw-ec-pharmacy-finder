@@ -1,5 +1,8 @@
 # 緊急避妊薬（要指導医薬品）販売可能な薬局検索
 
+> **English version below** / [Jump to English](#english)
+
+
 このリポジトリは、厚生労働省が公表している「要指導医薬品である緊急避妊薬の販売が可能な薬局等の一覧」を、
 検索しやすい **CSV / XLSX / JSON** に整形し、さらに **静的Web検索（GitHub Pages）** と **LINE Botサンプル** を添えたものです。
 
@@ -124,3 +127,43 @@ python3 scripts/geocode.py --force      # 全件再取得
 ## ライセンス
 - コード: MIT License
 - データ: 出典（厚労省）に従ってください（本リポジトリは原データの権利を主張しません）。
+
+---
+
+<a id="english"></a>
+
+# Emergency Contraceptive Pill — Pharmacy Finder (Japan)
+
+A search tool for pharmacies in Japan that sell emergency contraceptive pills (afterpills / morning-after pills), based on official data published by the Ministry of Health, Labour and Welfare (MHLW).
+
+- **Live site**: https://odakin.github.io/mhlw-ec-pharmacy-finder/
+- **Official data source**: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+
+## Features
+
+- **10,000+ pharmacies** across all 47 prefectures
+- **Map view** with marker clustering (Leaflet.js + OpenStreetMap)
+- **Sort by nearest** using browser geolocation
+- **Business hours** display with today's status highlighted
+- **Filters**: female pharmacist available, after-hours support, no appointment needed
+- **Google Maps link** for each pharmacy (directions, reviews, photos)
+- **Daily auto-update** via GitHub Actions
+
+## Important Notice
+
+- This tool does not provide medical advice.
+- Always confirm availability, hours, and conditions directly with the pharmacy before visiting.
+- The MHLW official page is the authoritative source.
+
+## Components
+
+| Directory | Description |
+|-----------|-------------|
+| `docs/` | Static website (GitHub Pages) |
+| `data/` | Cleaned CSV / XLSX / JSON data |
+| `scripts/` | Data update & geocoding scripts |
+| `line_bot/` | LINE Bot sample (Node.js) |
+
+## License
+- Code: MIT License
+- Data: Subject to MHLW terms (this repository does not claim rights over the original data).
