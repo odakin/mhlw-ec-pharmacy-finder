@@ -3,7 +3,7 @@
 > **English version below** / [Jump to English](#english)
 
 
-このリポジトリは、厚生労働省が公表している「要指導医薬品である緊急避妊薬の販売が可能な薬局等の一覧」を、
+このリポジトリは、厚生労働省が公表している緊急避妊薬（要指導医薬品）の販売が可能な薬局の一覧を、
 検索しやすい **CSV / XLSX / JSON** に整形し、さらに **静的Web検索（GitHub Pages）** と **LINE Botサンプル** を添えたものです。
 
 - 出典（公式ページ）: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
