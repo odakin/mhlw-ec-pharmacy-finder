@@ -583,17 +583,27 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
-function getHoursInfo(raw) {
+// Compute JST time context once per render cycle (avoids expensive toLocaleString per card)
+function getJstContext() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const todayDow = jst.getDay();
+  const nowMin = jst.getHours() * 60 + jst.getMinutes();
+  const isHoliday = isJapaneseHoliday(jst);
+  const yesterday = new Date(jst);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayIsHoliday = isJapaneseHoliday(yesterday);
+  return { todayDow, nowMin, isHoliday, yesterdayIsHoliday };
+}
+
+function getHoursInfo(raw, ctx) {
   // Returns { todayRanges, isOpen, parsed, allDays, todayDow, isHoliday, holidaySchedule, holidayClosed }
+  // ctx: optional pre-computed JST context from getJstContext()
   const parsed = parseHours(raw);
   if (!parsed) return { parsed: false };
 
-  const now = new Date();
-  // Force JST
-  const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-  const todayDow = jst.getDay(); // 0=Sun
-  const nowMin = jst.getHours() * 60 + jst.getMinutes();
-  const isHoliday = isJapaneseHoliday(jst);
+  if (!ctx) ctx = getJstContext();
+  const { todayDow, nowMin, isHoliday, yesterdayIsHoliday } = ctx;
 
   // Build per-day schedule
   const allDays = {};
@@ -637,9 +647,7 @@ function getHoursInfo(raw) {
   const yesterdayDow = (todayDow + 6) % 7;
   let yesterdayRanges = allDays[yesterdayDow] || [];
   // If yesterday was a holiday, use holiday ranges instead
-  const yesterday = new Date(jst);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (isJapaneseHoliday(yesterday)) {
+  if (yesterdayIsHoliday) {
     if (holidayClosed) {
       yesterdayRanges = [];
     } else if (holidayRanges.length) {
@@ -998,6 +1006,9 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
     el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（${show.length.toLocaleString()} 件表示）`;
   }
 
+  // Compute JST context once for the entire render batch
+  const jstCtx = getJstContext();
+
   for (const r of show) {
     const li = document.createElement("li");
     const title = escapeHtml(r.name || "(名称不明)");
@@ -1029,7 +1040,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
       : "";
 
     // Hours (Feature 3)
-    const hoursInfo = getHoursInfo(r.hours);
+    const hoursInfo = getHoursInfo(r.hours, jstCtx);
     const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
     // After-hours notice: show prominently when pharmacy is closed and has after-hours support
     const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
