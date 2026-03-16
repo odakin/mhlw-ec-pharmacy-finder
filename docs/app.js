@@ -130,6 +130,8 @@ function normalizeHoursText(raw) {
   // Normalize () / （） around time ranges to :
   s = s.replace(/([月火水木金土日祝])[（(]\s*(\d{1,2}:\d{2})/g, "$1:$2");
   s = s.replace(/(\d{1,2}:\d{2})\s*[）)]/g, "$1");
+  // Normalize お休み -> 休み (must run BEFORE 休み strip patterns)
+  s = s.replace(/お休み/g, "休み");
   // Strip trailing 休み/定休/休 suffixes (日・祝休み, 日祝休み, 土日祝:休み, etc.)
   s = s.replace(/[,、]\s*[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
   s = s.replace(/[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
@@ -166,8 +168,6 @@ function normalizeHoursText(raw) {
   s = s.replace(/第\d+(?:[,.]\s*第?\d+)+/g, (m) => "第" + m.replace(/[,.]\s*第?/g, "・").replace(/^第/, ""));
   // Normalize ordinal-related markers for segment-level handling in parseHours
   s = s.replace(/※/g, ",");
-  // Normalize お休み -> 休み
-  s = s.replace(/お休み/g, "休み");
   // Strip inline parenthesized ordinal overrides: (第2,4木:9:00-19:30) or (第2,4木曜:9:00-19:30)
   s = s.replace(/[(（]第[^)）]*\d{1,2}:\d{2}[^)）]*[)）]/g, "");
   s = s.trim();
@@ -220,6 +220,12 @@ function normalizeHoursText(raw) {
     const pb = b.padStart(4, "0");
     return `${pa.slice(0, 2)}:${pa.slice(2)}-${pb.slice(0, 2)}:${pb.slice(2)}`;
   });
+  // Final pass: catch day+time patterns created by earlier normalizations (e.g., after 曜日 strip)
+  s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2}:\d{2})/g, "$1-$2");
+  s = s.replace(/([月火水木金土日祝])\s+(\d{1,2}:\d{2})/g, "$1:$2");
+  s = s.replace(/([月火水木金土日祝])(\d{1,2}:\d{2})/g, "$1:$2");
+  // Strip trailing closed-day text missed by earlier passes
+  s = s.replace(/[,]\s*[月火水木金土日祝・,]+\s*[はで:]\s*$/g, "");
   return s;
 }
 
@@ -254,7 +260,8 @@ function parseDaySpec(spec) {
 
 function parseTimeRange(tr) {
   // "9:00-18:00" -> {open: "9:00", close: "18:00"}
-  const m = tr.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  // Also accept ~ as separator (in case normalization missed a tilde variant)
+  const m = tr.match(/^(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})$/);
   if (!m) return null;
   // Validate: hours 0-29 (Japan late-night convention: 25:00=1AM), minutes 0-59
   const [oh, om] = m[1].split(":").map(Number);
@@ -392,8 +399,10 @@ function parseHours(raw) {
     // Handle (第N) qualifiers on day specs
     // "水・土(第1・3・4):9:00-13:00" -> strip the qualified day, keep others: "水:9:00-13:00"
     // "土(第1-3):8:30-18:00" -> single day with ordinal, skip entire segment
-    // Skip ordinal+closed segments (第3土休み, 第3土お休み, etc.)
+    // Skip ordinal+closed segments (第3土休み, etc.)
     if (/^第[\d・]+[月火水木金土日].*(休み?|閉局|定休)/.test(seg)) continue;
+    // Skip orphaned ordinal markers (第3, 第1・3) left after normalization stripped 休み
+    if (/^第[\d・]+$/.test(seg)) continue;
 
     if (/[(（]第/.test(seg)) {
       // Remove "day(第...)" portions: 土(第1-3) -> empty, 水・土(第1・3・4) -> 水
@@ -404,6 +413,9 @@ function parseHours(raw) {
       // After stripping ordinal qualifiers, insert : if day char directly precedes time
       seg = seg.replace(/([月火水木金土日])(\d{1,2}:\d{2})/g, "$1:$2");
     }
+
+    // Skip closed-day segments without colon (日祝 休み, 日祝休業, etc.)
+    if (/^[月火水木金土日祝・,\s]+(休み?|閉局|定休|休業)\s*$/.test(seg)) continue;
 
     // Pattern: daySpec:timeRange(s)
     const m = seg.match(/^([月火水木金土日祝毎第\d][月火水木金土日祝毎第\d\-~・,]*)\s*[:]\s*(.+)$/);
