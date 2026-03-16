@@ -128,8 +128,8 @@ python3 scripts/geocode.py --force      # 全件再取得
 
 実装の設計判断や技術的背景を記録したドキュメントです。同種のプロジェクトを作る方や、コードを読む方の参考にどうぞ。
 
-- **[機能仕様書（FEATURE_SPEC.md）](docs/FEATURE_SPEC.md)** — 4機能の要件・技術選定の理由（なぜ東大CSISか、なぜNominatimは不採用か等）
-- **[営業時間パーサー設計（HOURS_PARSER.md）](docs/HOURS_PARSER.md)** — 6,933種のフォーマット揺れを97.1%パースする多段正規化パイプラインの設計と、各判断の背景
+- **[機能仕様書](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC.html)** — 4機能の要件・技術選定の理由（なぜ東大CSISか、なぜNominatimは不採用か等）
+- **[営業時間パーサー設計](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER.html)** — 6,933種のフォーマット揺れを97.1%パースする多段正規化パイプラインの設計と、各判断の背景
 
 ---
 
@@ -177,8 +177,8 @@ A search tool for pharmacies in Japan that sell emergency contraceptive pills (a
 
 Design documents recording the reasoning behind implementation decisions:
 
-- **[Feature Specification (FEATURE_SPEC.md)](docs/FEATURE_SPEC.md)** — Requirements and technical choices for all 4 features
-- **[Business Hours Parser Design (HOURS_PARSER.md)](docs/HOURS_PARSER.md)** — How the multi-stage normalization pipeline parses 6,933 format variations at 97.1% coverage
+- **[Feature Specification](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC.html)** — Requirements and technical choices for all 4 features
+- **[Business Hours Parser Design](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER.html)** — How the multi-stage normalization pipeline parses 6,933 format variations at 97.1% coverage
 
 ## License
 - Code: MIT License
