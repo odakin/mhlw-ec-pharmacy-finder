@@ -24,6 +24,7 @@ scripts/
 line_bot/                → LINE Bot サンプル
 AGENTS.md                → コードレビューガイドライン
 FEATURE_SPEC.md          → 機能仕様書（4機能の要件・技術方針）
+docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（GitHub Pages で公開）
 ```
 
 ## データ構造（docs/data.json）
@@ -79,7 +80,7 @@ git config core.hooksPath scripts/hooks
 1. **機能4**: Google Mapリンク — 各薬局カードに「📍 Google Mapで見る」リンク（コミット d83b795）
 2. **機能1**: 地図表示 — Leaflet.js + OpenStreetMap + markercluster。東大CSISでジオコーディング（コミット 514ad56, 3c3c685）
 3. **機能2**: 近い順ソート — Geolocation API + Haversine距離計算（コミット 3c3c685）
-4. **機能3**: 営業時間表示 — 曜日別パーサー（89.4%カバー率）+ 今日ハイライト + 折りたたみ全曜日表示（コミット 3c3c685）
+4. **機能3**: 営業時間表示 — 曜日別パーサー（97.1%カバー率）+ 今日ハイライト + 折りたたみ全曜日表示（コミット 3c3c685〜04853e7）
 
 ### ジオコーディング運用
 
