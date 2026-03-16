@@ -83,7 +83,7 @@ function normalizeHoursText(raw) {
     .replace(/[～〜~∼]/g, "~")
     .replace(/[－‐−⁻₋–—ー―ｰ]/g, "-")
     .replace(/[､、，]/g, ",")
-    .replace(/[・･]/g, "・")
+    .replace(/[・･•]/g, "・")
     .replace(/\s+/g, " ")
     .trim();
   // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00)
@@ -114,6 +114,88 @@ function normalizeHoursText(raw) {
   // Normalize CJK compatibility chars (⽉→月, ⼟→土, etc)
   s = s.replace(/⽉/g, "月").replace(/⽕/g, "火").replace(/⽔/g, "水")
     .replace(/⽊/g, "木").replace(/⾦/g, "金").replace(/⼟/g, "土").replace(/⽇/g, "日");
+  // Re-run normalizations after 時 conversion (金9時→金9:00 needs colon; 9:00~18:00 needs ~→-)
+  s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2}:\d{2})/g, "$1-$2");
+  s = s.replace(/([月火水木金土日祝])\s+(\d{1,2}:\d{2})/g, "$1:$2");
+  s = s.replace(/([月火水木金土日祝])(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize . and ． between day chars to ・ (月.火.金 -> 月・火・金)
+  s = s.replace(/([月火水木金土日祝])[.．]([月火水木金土日祝])/g, "$1・$2");
+  // Repeat for chains (月.火.水.木 needs multiple passes)
+  s = s.replace(/([月火水木金土日祝])[.．]([月火水木金土日祝])/g, "$1・$2");
+  // Normalize () / （） around time ranges to :
+  s = s.replace(/([月火水木金土日祝])[（(]\s*(\d{1,2}:\d{2})/g, "$1:$2");
+  s = s.replace(/(\d{1,2}:\d{2})\s*[）)]/g, "$1");
+  // Strip trailing 休み/定休/休 suffixes (日・祝休み, 日祝休み, 土日祝:休み, etc.)
+  s = s.replace(/[,、]\s*[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
+  s = s.replace(/[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
+  s = s.replace(/[月火水木金土日祝・,]+休み$/g, "");
+  s = s.replace(/定休[日:].*$/g, "");
+  // Strip "休:祝" / "休:日祝" type suffixes
+  s = s.replace(/[,]\s*休\s*[:]\s*[月火水木金土日祝・,]+$/g, "");
+  // Strip trailing 365日 suffix
+  s = s.replace(/365日/g, "");
+  // Strip trailing day-only text like "日" at end (月-金:...土:...日 = 日曜休み)
+  // Only if the last segment is a bare day char with no time
+  s = s.replace(/([,\s])([月火水木金土日祝・,]+)\s*$/g, (m, sep, days) => {
+    // Keep if it looks like a day spec that should have time
+    if (/[:]\s*\d/.test(days)) return m;
+    // If it's "日" or "日祝" etc at the end with no time, it means closed -> strip
+    if (/^[月火水木金土日祝・,]+$/.test(days)) return "";
+    return m;
+  });
+  // Strip segments ending with empty value like "水,日,祝は" "水日祝:"
+  s = s.replace(/[,]\s*[月火水木金土日祝・,]+\s*[はで:]\s*$/g, "");
+  // Reversed order: "9:00-20:00毎日" -> "毎日:9:00-20:00"
+  s = s.replace(/^(\d{1,2}:\d{2}-\d{1,2}:\d{2})\s*(毎日|月-日)$/, "$2:$1");
+  // Normalize ; to : as separator (月-金;9:00-17:00 -> 月-金:9:00-17:00)
+  s = s.replace(/([月火水木金土日祝])[;；]/g, "$1:");
+  // Normalize ｡ to , (segment separator)
+  s = s.replace(/｡/g, ",");
+  // Strip "祝を除く" / "祝除く" prefix
+  s = s.replace(/祝を?除く/g, "");
+  // Normalize "から" to "-" in day ranges (月から金 -> 月-金)
+  s = s.replace(/([月火水木金土日])から([月火水木金土日])/g, "$1-$2");
+  // Normalize "は" between day spec and time (月は9:00 -> 月:9:00)
+  s = s.replace(/([月火水木金土日祝])は(\d{1,2}:\d{2})/g, "$1:$2");
+  // Fix . used as segment separator (月-金:8:30-18:30.土:8:30-16:30)
+  s = s.replace(/(\d{1,2}:\d{2})[.．]([月火水木金土日祝毎])/g, "$1,$2");
+  // Fix . used as : in time (18.30 -> 18:30)
+  s = s.replace(/(\d{1,2})\.(\d{2})(?=\s*[-~]|\s*$)/g, "$1:$2");
+  s = s.replace(/(?<=[-~]\s*)(\d{1,2})\.(\d{2})/g, "$1:$2");
+  // Fix double colon (水::9:00 -> 水:9:00)
+  s = s.replace(/::/g, ":");
+  // Normalize "から" in time ranges (9:00から18:00 -> 9:00-18:00)
+  s = s.replace(/(\d{1,2}:\d{2})から(\d{1,2}:\d{2})/g, "$1-$2");
+  // Normalize ・ between time ranges to space (9:00-13:00・14:00-18:00 -> 9:00-13:00 14:00-18:00)
+  s = s.replace(/(\d{1,2}:\d{2})・(\d{1,2}:\d{2})/g, "$1 $2");
+  // Normalize "が" between day spec and time (水が8:00 -> 水:8:00)
+  s = s.replace(/([月火水木金土日祝])が(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize ） as separator (月火木）9:15 -> 月火木:9:15)
+  s = s.replace(/([月火水木金土日祝])[）)]\s*(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize ［］ brackets (［月］-> 月:)
+  s = s.replace(/[［\[]\s*([月火水木金土日祝・,\-~]+)\s*[］\]]\s*(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize (月火金) type brackets - before time or before colon
+  s = s.replace(/[（(]\s*([月火水木金土日祝・,\-~]+)\s*[）)]\s*[:]\s*/g, "$1:");
+  s = s.replace(/[（(]\s*([月火水木金土日祝・,\-~]+)\s*[）)]\s*(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize hour without minutes (9-18:00 -> 9:00-18:00)
+  // Match digit(s) before "-" only if not part of an existing HH:MM (not preceded by "digit:")
+  s = s.replace(/(?<!\d:\d)(?<!\d:)(\d{1,2})-(\d{1,2}:\d{2})/g, (m, h, end) => {
+    if (parseInt(h) <= 24) return h + ":00-" + end;
+    return m;
+  });
+  // Space-separated day chars (月 水 木 金:8:00 -> 月・水・木・金:8:00)
+  s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
+  s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
+  s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
+  // Fix 4-digit time without colon (1800 -> 18:00) only in time-range context
+  s = s.replace(/(\d{1,2}:\d{2})-(\d{3,4})(?!\d)/g, (_, a, b) => {
+    const padded = b.padStart(4, "0");
+    return `${a}-${padded.slice(0, 2)}:${padded.slice(2)}`;
+  });
+  s = s.replace(/(?<!\d)(\d{3,4})-(\d{1,2}:\d{2})/g, (_, a, b) => {
+    const padded = a.padStart(4, "0");
+    return `${padded.slice(0, 2)}:${padded.slice(2)}-${b}`;
+  });
   return s;
 }
 
@@ -121,11 +203,14 @@ function expandDayRange(startDay, endDay) {
   const s = DAY_MAP[startDay];
   const e = DAY_MAP[endDay];
   if (s == null || e == null || s < 0 || e < 0) return null;
+  // Same start/end means all 7 days (月-月) or single day handled elsewhere
+  if (s === e) return [s];
   const days = [];
-  for (let i = s; i !== ((e + 1) % 7); i = (i + 1) % 7) {
+  let i = s;
+  do {
     days.push(i);
-    if (days.length > 7) break;
-  }
+    i = (i + 1) % 7;
+  } while (i !== (e + 1) % 7 && days.length <= 7);
   return days;
 }
 
@@ -147,6 +232,10 @@ function parseTimeRange(tr) {
   // "9:00-18:00" -> {open: "9:00", close: "18:00"}
   const m = tr.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
   if (!m) return null;
+  // Validate: hours 0-29 (Japan late-night convention: 25:00=1AM), minutes 0-59
+  const [oh, om] = m[1].split(":").map(Number);
+  const [ch, cm] = m[2].split(":").map(Number);
+  if (oh > 29 || om > 59 || ch > 29 || cm > 59) return null;
   return { open: m[1], close: m[2] };
 }
 
@@ -256,11 +345,17 @@ function parseHours(raw) {
 
   const schedule = [];
 
-  // Handle day-less patterns: "9:00-20:00" (same hours every day)
-  const allDayMatch = text.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  // Handle day-less patterns: "9:00-20:00" or "9:00-13:00 14:00-18:00" or "9:00-13:00,14:00-18:00"
+  const allDayMatch = text.match(/^(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})([\s,]+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})*$/);
   if (allDayMatch) {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
-    return { schedule: [{ days: allDays, open: allDayMatch[1], close: allDayMatch[2] }] };
+    const ranges = text.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean);
+    const sched = [];
+    for (const r of ranges) {
+      const m = r.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+      if (m) sched.push({ days: allDays, open: m[1], close: m[2] });
+    }
+    if (sched.length) return { schedule: sched };
   }
 
   // Handle "毎日:9:00-20:00" pattern
@@ -280,6 +375,9 @@ function parseHours(raw) {
     const daySpec = m[1];
     const timePart = m[2].trim();
 
+    // Skip segments indicating closed days (休み, 閉局, 休, empty)
+    if (/^(休み?|閉局|定休)\s*$/.test(timePart) || !timePart) continue;
+
     // "毎日" -> all days
     const days = (daySpec === "毎日" || daySpec === "毎")
       ? [0, 1, 2, 3, 4, 5, 6]
@@ -294,7 +392,10 @@ function parseHours(raw) {
     const timeRanges = timePart.split(/\s+/).map((t) => t.trim()).filter(Boolean);
     for (const tr of timeRanges) {
       const range = parseTimeRange(tr);
-      if (!range) return null;
+      if (!range) {
+        // Skip unparseable time ranges in otherwise valid segments (graceful)
+        continue;
+      }
       schedule.push({ days, open: range.open, close: range.close });
     }
   }
