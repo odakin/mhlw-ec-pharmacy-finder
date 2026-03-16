@@ -108,6 +108,8 @@ function normalizeHoursText(raw) {
   s = s.replace(/(\d{1,2}:\d{2})(\d{1,2}:\d{2})/g, "$1 $2");
   // Normalize / between time ranges to space (9:00-14:00/15:00-19:00)
   s = s.replace(/(\d{1,2}:\d{2})\/(\d{1,2}:\d{2})/g, "$1 $2");
+  // Normalize / as segment separator (月-金:9:00-18:00/土:9:00-13:00)
+  s = s.replace(/(\d{1,2}:\d{2})\/([月火水木金土日祝])/g, "$1,$2");
   // Normalize 時 notation (9時-18時 -> 9:00-18:00)
   s = s.replace(/(\d{1,2})時(\d{2})分?/g, "$1:$2");
   s = s.replace(/(\d{1,2})時/g, "$1:00");
@@ -153,6 +155,36 @@ function normalizeHoursText(raw) {
   s = s.replace(/｡/g, ",");
   // Strip "祝を除く" / "祝除く" prefix
   s = s.replace(/祝を?除く/g, "");
+  // Normalize 漢数字 in ordinal day specs (第一土 -> 第1土, 第二 -> 第2, etc.)
+  s = s.replace(/([第・])([一二三四五])/g, (_, p, k) => p + ("一二三四五".indexOf(k) + 1));
+  // Strip ordinal-related suffixes (以外, ※)
+  s = s.replace(/以外/g, "");
+  s = s.replace(/※/g, ",");
+  // Strip ordinal day segments (第N土:time, 第1・3・5土:time, etc.) - can't represent in weekly schedule
+  // Must run BEFORE splitHoursSegments to avoid comma/period splitting issues
+  // Handles: 第1土:9:00-13:00  第1,3,5土:9:00-18:00  第1.3.5土:8:30-13:30  第2・4土:9:00-14:00
+  // Also handles: 土(第1-3):8:30-18:00  土(第4):9:00-13:00  水・土(第1・3・4):9:00-13:00
+  // Remove ordinal segments: 第1土:9:00-13:00, 第1・第3土:9:00-14:00, 第1.3.5土:8:30-13:30
+  // The ordinal prefix pattern: 第 followed by digits/separators/第, then a day char
+  const ordPfx = "第[\\d・,.\\s第\\-]+[月火水木金土日]";
+  // With time: ordinal prefix + colon + time range(s)
+  const ordWithTime = new RegExp(ordPfx + "\\s*[:]\\s*\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2}(\\s+\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2})*", "g");
+  // Strip concatenated ordinal segments (after time, no comma)
+  s = s.replace(ordWithTime, "");
+  // Strip comma-separated ordinal segments (with or without time)
+  const ordSeg = new RegExp("[,、]\\s*" + ordPfx + "[^,]*", "g");
+  s = s.replace(ordSeg, "");
+  // Strip ordinal at start of string
+  const ordStart = new RegExp("^" + ordPfx + "[^,]*[,、]\\s*", "g");
+  s = s.replace(ordStart, "");
+  s = s.replace(new RegExp("^" + ordPfx + "[^,]*$", "g"), "");
+  // Strip dangling ordinal fragments (第1 without day char at end)
+  s = s.replace(/第[\d・,.\s第]+\s*$/, "");
+  // Clean up trailing/leading commas from stripping
+  s = s.replace(/^[,、\s]+/, "").replace(/[,、\s]+$/, "");
+  // Handle "土(第N)" pattern - strip the ordinal qualifier, keep as regular day
+  s = s.replace(/([月火水木金土日])\s*[(（]第[^)）]*[)）]/g, "$1");
+  s = s.trim();
   // Normalize "から" to "-" in day ranges (月から金 -> 月-金)
   s = s.replace(/([月火水木金土日])から([月火水木金土日])/g, "$1-$2");
   // Normalize "は" between day spec and time (月は9:00 -> 月:9:00)
@@ -187,7 +219,7 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
   s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
   s = s.replace(/([月火水木金土日])\s+([月火水木金土日])(?=[\s:・]|$)/g, "$1・$2");
-  // Fix 4-digit time without colon (1800 -> 18:00) only in time-range context
+  // Fix 3-4 digit time without colon (1800 -> 18:00, 900 -> 9:00) in time-range context
   s = s.replace(/(\d{1,2}:\d{2})-(\d{3,4})(?!\d)/g, (_, a, b) => {
     const padded = b.padStart(4, "0");
     return `${a}-${padded.slice(0, 2)}:${padded.slice(2)}`;
@@ -195,6 +227,12 @@ function normalizeHoursText(raw) {
   s = s.replace(/(?<!\d)(\d{3,4})-(\d{1,2}:\d{2})/g, (_, a, b) => {
     const padded = a.padStart(4, "0");
     return `${padded.slice(0, 2)}:${padded.slice(2)}-${b}`;
+  });
+  // Both sides without colon: 900-1800 (after day:)
+  s = s.replace(/(?<=[:])(\d{3,4})-(\d{3,4})(?!\d)/g, (_, a, b) => {
+    const pa = a.padStart(4, "0");
+    const pb = b.padStart(4, "0");
+    return `${pa.slice(0, 2)}:${pa.slice(2)}-${pb.slice(0, 2)}:${pb.slice(2)}`;
   });
   return s;
 }
@@ -246,7 +284,7 @@ function splitHoursSegments(text) {
 
   // Step 1: Split at day boundaries after time (handles no-comma and space-separated)
   // "月-金:9:00-18:00 土:9:00-13:00" or "月-金:9:00-18:00土:9:00-13:00"
-  let pieces = text.split(/(?<=\d:\d{2})\s*(?=[月火水木金土日祝毎])/);
+  let pieces = text.split(/(?<=\d:\d{2})\s*(?=[月火水木金土日祝毎第])/);
   pieces = pieces.map((s) => s.trim()).filter(Boolean);
   if (pieces.length > 1) {
     // Each piece may still have internal commas for time ranges
@@ -369,7 +407,7 @@ function parseHours(raw) {
 
   for (const seg of segments) {
     // Pattern: daySpec:timeRange(s)
-    const m = seg.match(/^([月火水木金土日祝毎][月火水木金土日祝毎\-~・,]*)\s*[:]\s*(.+)$/);
+    const m = seg.match(/^([月火水木金土日祝毎第\d][月火水木金土日祝毎第\d\-~・,]*)\s*[:]\s*(.+)$/);
     if (!m) return null; // can't parse -> give up on entire string
 
     const daySpec = m[1];
@@ -377,6 +415,9 @@ function parseHours(raw) {
 
     // Skip segments indicating closed days (休み, 閉局, 休, empty)
     if (/^(休み?|閉局|定休)\s*$/.test(timePart) || !timePart) continue;
+
+    // Skip ordinal day segments (第1土, 第2・4土, etc.) - can't represent in weekly schedule
+    if (/第\d/.test(daySpec)) continue;
 
     // "毎日" -> all days
     const days = (daySpec === "毎日" || daySpec === "毎")
