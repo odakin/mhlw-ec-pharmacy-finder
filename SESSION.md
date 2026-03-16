@@ -183,9 +183,10 @@
   - クリティカルバグなし。Minor 4件（実用上問題なし）
   - `getHoursInfo()` 内の `toLocaleString("en-US", {timeZone: "Asia/Tokyo"})` がカードごとに呼ばれていた問題を修正
   - `getJstContext()` を新設し、レンダリングバッチごとに1回だけ JST 変換を実行、`getHoursInfo(raw, ctx)` に渡す設計に変更
-- [x] **祝日法改正チェックのスケジュールタスク登録** — 登録済み
-  - スケジュールタスク `holiday-law-check`（毎年1月15日 10:00）
-  - 法改正の有無を確認し、`getJapaneseHolidays()` の更新要否を報告
+- [x] **祝日法改正チェックの仕組み** — CLAUDE.md に常設指示として記載
+  - 毎年1月以降、プロジェクトで最初に作業する際に Claude が自動チェック
+  - 最終チェック日を CLAUDE.md 内に記録し、年次更新
+  - スケジュールタスク方式（Mac依存・不確実）から CLAUDE.md 常設指示方式に変更
 - [x] **HOURS_PARSER.md 更新** — Phase 5 を現状の「抽出→除去」2段階に修正、アーキテクチャ図に holidaySchedule/holidayClosed 出力を反映
 - [x] **HTML ドキュメント同期修正** — 静的HTMLが.mdと乖離していた問題を修正。marked.js で .md を fetch+render する方式に変更し、.md が single source of truth に
 
