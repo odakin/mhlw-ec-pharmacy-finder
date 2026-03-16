@@ -71,6 +71,86 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
+// ── Japanese national holiday computation ──
+// Based on 国民の祝日に関する法律. Valid ~1980-2099.
+
+function getJapaneseHolidays(year) {
+  // Returns Set of "YYYY-MM-DD" strings for the given year
+  const holidays = [];
+  const d = (m, day) => `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const nthMon = (month, n) => {
+    // nth Monday of month
+    const first = new Date(year, month - 1, 1).getDay(); // 0=Sun
+    const firstMon = first <= 1 ? 2 - first : 9 - first;
+    return firstMon + (n - 1) * 7;
+  };
+
+  // Fixed-date holidays
+  holidays.push(d(1, 1));   // 元日
+  holidays.push(d(2, 11));  // 建国記念の日
+  holidays.push(d(2, 23));  // 天皇誕生日 (2020-)
+  holidays.push(d(4, 29));  // 昭和の日
+  holidays.push(d(5, 3));   // 憲法記念日
+  holidays.push(d(5, 4));   // みどりの日
+  holidays.push(d(5, 5));   // こどもの日
+  holidays.push(d(8, 11));  // 山の日
+  holidays.push(d(11, 3));  // 文化の日
+  holidays.push(d(11, 23)); // 勤労感謝の日
+
+  // Happy Monday holidays
+  holidays.push(d(1, nthMon(1, 2)));   // 成人の日 (2nd Mon Jan)
+  holidays.push(d(7, nthMon(7, 3)));   // 海の日 (3rd Mon Jul)
+  holidays.push(d(9, nthMon(9, 3)));   // 敬老の日 (3rd Mon Sep)
+  holidays.push(d(10, nthMon(10, 2))); // スポーツの日 (2nd Mon Oct)
+
+  // Equinox holidays (astronomical formula, valid ~1980-2099)
+  const vernalDay = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  holidays.push(d(3, vernalDay)); // 春分の日
+  const autumnalDay = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  holidays.push(d(9, autumnalDay)); // 秋分の日
+
+  // 振替休日 (substitute holidays): if a holiday falls on Sunday, next Monday is a holiday
+  const baseSet = new Set(holidays);
+  const substitutes = [];
+  for (const h of holidays) {
+    const dt = new Date(h + "T00:00:00");
+    if (dt.getDay() === 0) { // Sunday
+      // Find next non-holiday weekday
+      let sub = new Date(dt);
+      do { sub.setDate(sub.getDate() + 1); }
+      while (baseSet.has(sub.toISOString().slice(0, 10)) || substitutes.includes(sub.toISOString().slice(0, 10)));
+      substitutes.push(sub.toISOString().slice(0, 10));
+    }
+  }
+  substitutes.forEach(s => baseSet.add(s));
+
+  // 国民の休日: a day sandwiched between two holidays (mainly Sep)
+  const sorted = [...baseSet].sort();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = new Date(sorted[i] + "T00:00:00");
+    const b = new Date(sorted[i + 1] + "T00:00:00");
+    const diff = (b - a) / 86400000;
+    if (diff === 2) {
+      const mid = new Date(a);
+      mid.setDate(mid.getDate() + 1);
+      const midStr = mid.toISOString().slice(0, 10);
+      if (mid.getDay() !== 0) baseSet.add(midStr); // Not Sunday (would be 振替休日 instead)
+    }
+  }
+
+  return baseSet;
+}
+
+// Cache per year
+const _holidayCache = {};
+function isJapaneseHoliday(date) {
+  // date: Date object (JST)
+  const y = date.getFullYear();
+  if (!_holidayCache[y]) _holidayCache[y] = getJapaneseHolidays(y);
+  const key = `${y}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return _holidayCache[y].has(key);
+}
+
 // ── Feature 3: Hours parsing ──
 
 const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
@@ -160,7 +240,8 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日祝])[;；]/g, "$1:");
   // Normalize ｡ to , (segment separator)
   s = s.replace(/｡/g, ",");
-  // Strip "祝を除く" / "祝除く" prefix
+  // "祝を除く" / "祝除く" — keep marker for holidayClosed detection, then strip
+  // (Detection happens in parseHours before this text is consumed)
   s = s.replace(/祝を?除く/g, "");
   // Normalize 漢数字 in ordinal day specs (第一土 -> 第1土, 第二 -> 第2, etc.)
   // Also handle comma-preceded: ,四日 -> ,4日
@@ -369,11 +450,23 @@ function parseDaySpecExtended(spec) {
 }
 
 function parseHours(raw) {
-  // Returns: { schedule: [{days: [0-6], open: "9:00", close: "18:00"}, ...] } or null
+  // Returns: { schedule: [{days: [0-6], open, close}, ...], holidaySchedule: [{open, close}], holidayClosed: bool } or null
+  if (!raw) return null;
+
+  // Detect holidayClosed from raw text BEFORE normalization strips it
+  const rawNorm = (raw || "").toString()
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/祝日/g, "祝");
+  const holidayClosed = /祝[・]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
+    || /[日土][・,]?祝\s*(休|閉|定休|休業|休日)/.test(rawNorm)
+    || /休\s*[：:]\s*[月火水木金土日・,]*祝/.test(rawNorm)
+    || /祝を?除く/.test(rawNorm);
+
   const text = normalizeHoursText(raw);
   if (!text) return null;
 
   const schedule = [];
+  const holidaySchedule = [];
 
   // Handle day-less patterns: "9:00-20:00" or "9:00-13:00 14:00-18:00" or "9:00-13:00,14:00-18:00"
   const allDayMatch = text.match(/^(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})([\s,]+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})*$/);
@@ -385,14 +478,14 @@ function parseHours(raw) {
       const m = r.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
       if (m) sched.push({ days: allDays, open: m[1], close: m[2] });
     }
-    if (sched.length) return { schedule: sched };
+    if (sched.length) return { schedule: sched, holidaySchedule: [], holidayClosed };
   }
 
   // Handle "毎日:9:00-20:00" pattern
   const everyDayMatch = text.match(/^毎日\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
   if (everyDayMatch) {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
-    return { schedule: [{ days: allDays, open: everyDayMatch[1], close: everyDayMatch[2] }] };
+    return { schedule: [{ days: allDays, open: everyDayMatch[1], close: everyDayMatch[2] }], holidaySchedule: [], holidayClosed };
   }
 
   const segments = splitHoursSegments(text);
@@ -444,9 +537,20 @@ function parseHours(raw) {
     const days = (daySpec === "毎日" || daySpec === "毎")
       ? [0, 1, 2, 3, 4, 5, 6]
       : parseDaySpecExtended(daySpec);
+
+    // Check if this daySpec includes 祝
+    const hasHoliday = /祝/.test(daySpec);
+
     if (!days || !days.length) {
-      // Skip holiday-only segments (祝:...) gracefully
-      if (/^祝/.test(daySpec)) continue;
+      // Holiday-only segments (祝:...) -> capture into holidaySchedule
+      if (hasHoliday) {
+        const timeRanges = timePart.split(/\s+/).map((t) => t.trim()).filter(Boolean);
+        for (const tr of timeRanges) {
+          const range = parseTimeRange(tr);
+          if (range) holidaySchedule.push({ open: range.open, close: range.close });
+        }
+        continue;
+      }
       return null;
     }
 
@@ -459,10 +563,14 @@ function parseHours(raw) {
         continue;
       }
       schedule.push({ days, open: range.open, close: range.close });
+      // If daySpec includes 祝 (e.g. 日祝, 土日祝), also capture as holiday hours
+      if (hasHoliday) {
+        holidaySchedule.push({ open: range.open, close: range.close });
+      }
     }
   }
 
-  return schedule.length ? { schedule } : null;
+  return schedule.length ? { schedule, holidaySchedule, holidayClosed } : null;
 }
 
 function timeToMinutes(hhmm) {
@@ -471,7 +579,7 @@ function timeToMinutes(hhmm) {
 }
 
 function getHoursInfo(raw) {
-  // Returns { todayRanges: [{open, close}], isOpen, parsed: true/false, allDays: {0: [...], ...} }
+  // Returns { todayRanges, isOpen, parsed, allDays, todayDow, isHoliday, holidaySchedule, holidayClosed }
   const parsed = parseHours(raw);
   if (!parsed) return { parsed: false };
 
@@ -480,6 +588,7 @@ function getHoursInfo(raw) {
   const jst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const todayDow = jst.getDay(); // 0=Sun
   const nowMin = jst.getHours() * 60 + jst.getMinutes();
+  const isHoliday = isJapaneseHoliday(jst);
 
   // Build per-day schedule
   const allDays = {};
@@ -496,7 +605,29 @@ function getHoursInfo(raw) {
     allDays[d].sort((a, b) => timeToMinutes(a.open) - timeToMinutes(b.open));
   }
 
-  const todayRanges = allDays[todayDow] || [];
+  // Holiday schedule (sorted)
+  const holidayRanges = (parsed.holidaySchedule || []).slice()
+    .sort((a, b) => timeToMinutes(a.open) - timeToMinutes(b.open));
+  const holidayClosed = parsed.holidayClosed || false;
+
+  // Determine today's effective ranges
+  let todayRanges;
+  let todayUsingHoliday = false; // true if holiday override is active
+  if (isHoliday) {
+    if (holidayClosed) {
+      todayRanges = [];
+      todayUsingHoliday = true;
+    } else if (holidayRanges.length) {
+      todayRanges = holidayRanges;
+      todayUsingHoliday = true;
+    } else {
+      // No holiday info -> fall back to regular weekday schedule
+      todayRanges = allDays[todayDow] || [];
+    }
+  } else {
+    todayRanges = allDays[todayDow] || [];
+  }
+
   let isOpen = false;
   for (const r of todayRanges) {
     if (nowMin >= timeToMinutes(r.open) && nowMin < timeToMinutes(r.close)) {
@@ -505,7 +636,10 @@ function getHoursInfo(raw) {
     }
   }
 
-  return { parsed: true, todayRanges, isOpen, allDays, todayDow: todayDow };
+  return {
+    parsed: true, todayRanges, isOpen, allDays, todayDow,
+    isHoliday, todayUsingHoliday, holidayRanges, holidayClosed
+  };
 }
 
 function renderHoursHtml(raw) {
@@ -515,32 +649,48 @@ function renderHoursHtml(raw) {
     return raw ? `<div class="detail"><span class="k">開局等時間</span> ${escapeHtml(raw)}</div>` : "";
   }
 
-  const { todayRanges, isOpen, allDays, todayDow } = info;
+  const { todayRanges, isOpen, allDays, todayDow, isHoliday, todayUsingHoliday, holidayRanges, holidayClosed } = info;
   const todayName = DAY_NAMES[todayDow];
+  const holidayLabel = isHoliday ? "（祝日）" : "";
 
   // Today's highlight
   let todayHtml = "";
   if (todayRanges.length) {
+    const badgeText = isOpen
+      ? (todayUsingHoliday ? "営業中（祝日時間）" : "営業中")
+      : "営業時間外";
     const badge = isOpen
-      ? `<span class="badge open">営業中</span>`
-      : `<span class="badge closed">営業時間外</span>`;
+      ? `<span class="badge open">${badgeText}</span>`
+      : `<span class="badge closed">${badgeText}</span>`;
     const times = todayRanges.map((r) => `${r.open}-${r.close}`).join(", ");
-    todayHtml = `<div class="hours-today">${badge} <strong>${todayName}曜</strong> ${times}</div>`;
+    todayHtml = `<div class="hours-today">${badge} <strong>${todayName}曜${holidayLabel}</strong> ${times}</div>`;
   } else {
-    todayHtml = `<div class="hours-today"><span class="badge closed">本日休み</span></div>`;
+    const closedText = todayUsingHoliday ? "本日休み（祝日）" : "本日休み";
+    todayHtml = `<div class="hours-today"><span class="badge closed">${closedText}</span></div>`;
   }
 
-  // Full schedule (collapsible)
+  // Full schedule (collapsible) — Monday-first order
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // 月火水木金土日
   let schedHtml = `<details class="hours-full"><summary class="small">全営業時間</summary><div class="hours-grid">`;
-  for (let d = 0; d < 7; d++) {
+  for (const d of dayOrder) {
     const name = DAY_NAMES[d];
     const ranges = allDays[d];
-    const cls = d === todayDow ? ' class="today"' : "";
+    const cls = (d === todayDow && !todayUsingHoliday) ? ' class="today"' : "";
     if (ranges.length) {
       const times = ranges.map((r) => `${r.open}-${r.close}`).join(", ");
       schedHtml += `<div${cls}><span class="day">${name}</span> ${times}</div>`;
     } else {
       schedHtml += `<div${cls}><span class="day">${name}</span> <span class="rest">休み</span></div>`;
+    }
+  }
+  // Holiday row (only if pharmacy has holiday-specific data)
+  if (holidayRanges.length || holidayClosed) {
+    const holCls = todayUsingHoliday ? ' class="today holiday-row"' : ' class="holiday-row"';
+    if (holidayClosed) {
+      schedHtml += `<div${holCls}><span class="day">祝</span> <span class="rest">休み</span></div>`;
+    } else {
+      const times = holidayRanges.map((r) => `${r.open}-${r.close}`).join(", ");
+      schedHtml += `<div${holCls}><span class="day">祝</span> ${times}</div>`;
     }
   }
   schedHtml += `</div><div class="hours-note">※営業状況は店舗にご確認ください</div></details>`;
