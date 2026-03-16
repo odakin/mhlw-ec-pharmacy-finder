@@ -458,11 +458,14 @@ function parseHours(raw) {
   // Detect holidayClosed from raw text BEFORE normalization strips it
   const rawNorm = (raw || "").toString()
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
-    .replace(/祝日/g, "祝");
-  const holidayClosed = /祝[・:：]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
-    || /[日土][・,]?祝[・:：]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
-    || /休\s*[：:]\s*[月火水木金土日・,]*祝/.test(rawNorm)
-    || /祝を?除く/.test(rawNorm);
+    .replace(/[・･•]/g, "・").replace(/[;；]/g, ";")
+    .replace(/祝祭日/g, "祝").replace(/祝日/g, "祝");
+  const holidayClosed = /祝[・:：は;]?\s*(休|閉局|定休|休業|休日|終日閉局)/.test(rawNorm)
+    || /[月火水木金土日][・,]?祝[・:：は;]?\s*(休|閉局|定休|休業|休日|終日閉局)/.test(rawNorm)
+    || /休[業日]?\s*[：:;]?\s*[月火水木金土日曜・,\s]*祝/.test(rawNorm)
+    || /定休[日]?\s*[：:;\s]*[月火水木金土日・,\s]*祝/.test(rawNorm)
+    || /祝を?除く/.test(rawNorm)
+    || /[（(]祝[・年末年始]*除く[）)]/.test(rawNorm);
 
   const text = normalizeHoursText(raw);
   if (!text) return null;
@@ -630,11 +633,39 @@ function getHoursInfo(raw) {
     todayRanges = allDays[todayDow] || [];
   }
 
+  // Also check yesterday's late-night ranges (close > 24:00 means past midnight)
+  const yesterdayDow = (todayDow + 6) % 7;
+  let yesterdayRanges = allDays[yesterdayDow] || [];
+  // If yesterday was a holiday, use holiday ranges instead
+  const yesterday = new Date(jst);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isJapaneseHoliday(yesterday)) {
+    if (holidayClosed) {
+      yesterdayRanges = [];
+    } else if (holidayRanges.length) {
+      yesterdayRanges = holidayRanges;
+    }
+  }
+
   let isOpen = false;
+  // Check today's ranges
   for (const r of todayRanges) {
     if (nowMin >= timeToMinutes(r.open) && nowMin < timeToMinutes(r.close)) {
       isOpen = true;
       break;
+    }
+  }
+  // Check yesterday's late-night ranges (close > 24:00 spills into today)
+  if (!isOpen) {
+    for (const r of yesterdayRanges) {
+      const closeMin = timeToMinutes(r.close);
+      if (closeMin > 1440) { // > 24:00
+        // nowMin is in today; yesterday's range spills over by (closeMin - 1440) minutes
+        if (nowMin < closeMin - 1440) {
+          isOpen = true;
+          break;
+        }
+      }
     }
   }
 
@@ -644,8 +675,8 @@ function getHoursInfo(raw) {
   };
 }
 
-function renderHoursHtml(raw) {
-  const info = getHoursInfo(raw);
+function renderHoursHtml(raw, info) {
+  if (!info) info = getHoursInfo(raw);
   if (!info.parsed) {
     // Fallback: show raw data
     return raw ? `<div class="detail"><span class="k">開局等時間</span> ${escapeHtml(raw)}</div>` : "";
@@ -999,7 +1030,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
     // Hours (Feature 3)
     const hoursInfo = getHoursInfo(r.hours);
-    const hoursHtml = renderHoursHtml(r.hours);
+    const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
     // After-hours notice: show prominently when pharmacy is closed and has after-hours support
     const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
     const afterHoursNote = (isClosed && afterHoursFlag)
