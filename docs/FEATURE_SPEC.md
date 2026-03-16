@@ -1,3 +1,7 @@
+---
+title: 機能仕様書 — 緊急避妊薬 薬局検索
+---
+
 # mhlw-ec-pharmacy-finder 機能追加指示書
 
 ## 概要
