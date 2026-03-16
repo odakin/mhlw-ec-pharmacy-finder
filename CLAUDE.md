@@ -14,6 +14,9 @@ docs/                    → GitHub Pages 公開ディレクトリ
   index.html / app.js / style.css  → フロントエンド（バニラJS）
   data.json              → 薬局データ（10,128件）
   geocode_cache.json     → ジオコーディング結果（フロントエンド配信用コピー）
+  FEATURE_SPEC.html / HOURS_PARSER.html → ドキュメントHTML（marked.jsで.mdをfetch+render）
+  marked.min.js          → Markdownレンダリング（ローカルバンドル）
+  .nojekyll              → Jekyll無効化
 data/                    → 元データ・キャッシュ
   *.xlsx / *.csv / *.json → 厚労省データ加工済み
   geocode_cache.json     → ジオコーディング結果（マスター）
