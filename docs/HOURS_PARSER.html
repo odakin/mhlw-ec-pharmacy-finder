@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>営業時間パーサー設計 — mhlw-ec-pharmacy-finder</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -17,6 +18,7 @@ body {
 h1 { font-size: 1.8em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
 h2 { font-size: 1.4em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; margin-top: 1.5em; }
 h3 { font-size: 1.15em; margin-top: 1.2em; }
+h4 { font-size: 1.05em; margin-top: 1em; }
 a { color: #0969da; text-decoration: none; }
 a:hover { text-decoration: underline; }
 code { background: #f6f8fa; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
@@ -31,7 +33,7 @@ strong { font-weight: 600; }
 ul, ol { padding-left: 2em; }
 .nav { margin-bottom: 1.5em; font-size: 0.9em; }
 .nav a { margin-right: 1em; }
-.arch { background: #f6f8fa; padding: 16px; border-radius: 6px; font-family: monospace; white-space: pre; line-height: 1.4; overflow-x: auto; }
+#content { min-height: 200px; }
 </style>
 </head>
 <body>
@@ -40,314 +42,17 @@ ul, ol { padding-left: 2em; }
   <a href="FEATURE_SPEC.html">📄 機能仕様書</a>
   <a href="https://github.com/odakin/mhlw-ec-pharmacy-finder">📦 GitHub</a>
 </div>
-
-<h1>営業時間パーサー設計ドキュメント</h1>
-
-<h2>なぜこんなに複雑なのか</h2>
-
-<h3>根本原因: 厚労省データが自由記述</h3>
-<p>
-厚労省の薬局データ（10,128件）の <code>hours</code> フィールドは<strong>自由記述テキスト</strong>。
-統一フォーマットの指定がなく、各都道府県・薬局が独自に入力している。
-同じ「月-金 9:00-18:00」を表すのに数千通りの書き方が混在する。
-</p>
-
-<h3>最初に試した単純なアプローチ</h3>
-<p>
-初版（89.4%）は <code>月-金:9:00-18:00,土:9:00-13:00</code> のような「きれいな」パターンだけ対応した。
-しかし全角文字、漢字時刻、括弧、スラッシュ、タイプミスなどで1割以上がパースできなかった。
-</p>
-
-<h3>なぜ段階的に複雑になったか</h3>
-<p>
-1つのルールを追加するたびに、そのルールが既存ルールの出力に干渉するケースが見つかった。
-例えば <code>金9時</code> → <code>金9:00</code> に変換した後、<code>金9:00</code> → <code>金:9:00</code> のコロン挿入が必要になる。
-このように<strong>正規化ルールには順序依存性がある</strong>ため、場当たり的に追加できず、
-パイプライン全体の整合性を保つ必要がある。
-</p>
-
-<h3>数字で見る複雑さ</h3>
-<ul>
-  <li>全9,951件（hours非空）のうち、一意なフォーマットは約6,933種</li>
-  <li>カバー率: 97.1%（9,659件をパース可能）</li>
-  <li>残り2.9%は自然言語・URL・極端なデータ不良</li>
-  <li>normalizeHoursText に約50段の置換ルール</li>
-</ul>
-
-<hr>
-
-<h2>アーキテクチャ概要</h2>
-
-<div class="arch">生テキスト
-  ↓
-normalizeHoursText()  ← テキスト正規化（約50段の置換ルール）
-  ↓
-正規化済みテキスト（例: "月-金:9:00-18:00,土:9:00-13:00"）
-  ↓
-splitHoursSegments()  ← 曜日グループごとに分割
-  ↓
-セグメント配列（例: ["月-金:9:00-18:00", "土:9:00-13:00"]）
-  ↓
-parseHours()          ← 各セグメントから曜日+時間帯を抽出
-  ↓
-構造化データ: { schedule: [{days: [1,2,3,4,5], open: "9:00", close: "18:00"}, ...] }</div>
-
-<hr>
-
-<h2>normalizeHoursText(): なぜ50段もあるのか</h2>
-<p>入力テキストの揺れを「1つの正規形」に収束させるのが目的。各ルールは実データで発見された具体的なパターンに対応している。</p>
-
-<h3>Phase 1: 文字レベルの統一</h3>
-<p><strong>なぜ最初にやるか</strong>: 後続の全ルールが <code>9:00</code> <code>-</code> <code>月</code> などの半角・標準文字を前提にしている。
-ここで統一しないと、後続の正規表現が全角版と半角版の2倍必要になり、保守不能になる。</p>
-
-<table>
-<tr><th>ルール</th><th>入力例</th><th>出力</th><th>なぜ必要か</th></tr>
-<tr><td>全角数字→半角</td><td><code>９：００</code></td><td><code>9:00</code></td><td>全角混在が非常に多い</td></tr>
-<tr><td>コロン系文字統一</td><td><code>：</code> <code>∶</code> <code>︓</code> <code>ː</code></td><td><code>:</code></td><td>5種類のコロン類似文字が実データに存在</td></tr>
-<tr><td>チルダ系→<code>~</code></td><td><code>～</code> <code>〜</code> <code>∼</code></td><td><code>~</code></td><td>範囲記号が4種類</td></tr>
-<tr><td>ダッシュ系→<code>-</code></td><td><code>－</code> <code>‐</code> <code>−</code> <code>–</code> <code>—</code> <code>ー</code> <code>―</code> <code>ｰ</code></td><td><code>-</code></td><td>9種類のハイフン/ダッシュが存在</td></tr>
-<tr><td>句読点統一</td><td><code>､</code> <code>、</code> <code>，</code></td><td><code>,</code></td><td>区切り文字の揺れ</td></tr>
-<tr><td>CJK互換文字</td><td><code>⽉</code> <code>⼟</code> <code>⽇</code></td><td><code>月</code> <code>土</code> <code>日</code></td><td>Unicode互換領域の文字が一部データに混入</td></tr>
-</table>
-
-<blockquote>
-<strong>実例</strong>: ある県のデータは全件 <code>⽉⽕⽔⽊⾦⼟⽇</code> (CJK互換)で入力されていた。
-見た目は同じ「月火水」だが Unicode のコードポイントが違うため、正規表現 <code>[月火水]</code> にマッチしない。
-</blockquote>
-
-<h3>Phase 2: 日本語表現の正規化</h3>
-<p><strong>なぜ必要か</strong>: 同じ曜日を <code>月</code> <code>月曜</code> <code>月曜日</code> の3通りで書く人がいる。
-また <code>平日</code> <code>年中無休</code> のような日本語略称もある。
-曜日を1文字に統一しないと、後続の曜日パース（<code>parseDaySpec</code>）が組合せ爆発する。</p>
-
-<table>
-<tr><th>ルール</th><th>入力例</th><th>出力</th><th>なぜ必要か</th></tr>
-<tr><td>曜日suffix strip</td><td><code>月曜日</code> <code>金曜</code></td><td><code>月</code> <code>金</code></td><td><code>月</code>だけで十分。ただし<code>金曜日曜</code>は<code>金日</code>（後述）</td></tr>
-<tr><td>range末尾+曜日隣接</td><td><code>月-金日</code>（strip後）</td><td><code>月-金・日</code></td><td>曜日stripで消えた<code>曜</code>のせいで金と日がくっつく</td></tr>
-<tr><td><code>年中無休</code>→<code>毎日</code></td><td><code>年中無休</code></td><td><code>毎日</code></td><td>曜日指定なしの表現</td></tr>
-<tr><td><code>平日</code>→<code>月-金</code></td><td><code>平日</code></td><td><code>月-金</code></td><td>日本語の略称</td></tr>
-<tr><td><code>24時間</code>→全日</td><td><code>24時間</code></td><td><code>毎日:0:00-24:00</code></td><td></td></tr>
-<tr><td><code>時</code>/<code>分</code>表記</td><td><code>9時30分</code> <code>18時</code></td><td><code>9:30</code> <code>18:00</code></td><td>漢字の時刻表記</td></tr>
-<tr><td><code>から</code>→<code>-</code></td><td><code>月から金</code> <code>9:00から18:00</code></td><td><code>月-金</code> <code>9:00-18:00</code></td><td>ひらがな接続詞</td></tr>
-<tr><td><code>は</code>/<code>が</code>→<code>:</code></td><td><code>月は9:00</code> <code>水が8:00</code></td><td><code>月:9:00</code> <code>水:8:00</code></td><td>助詞が区切り文字代わり</td></tr>
-</table>
-
-<blockquote>
-<strong>ハマった事例: <code>金曜日曜</code> の貪欲マッチ</strong><br>
-<code>月曜-金曜日曜9:00-18:00</code> を <code>曜日?</code> で strip すると、<code>金曜日</code> が先にマッチして
-<code>日</code>（日曜の日）まで食べてしまい、日曜が消える。<br>
-修正: <code>曜(?:日(?!曜))?</code> — <code>日</code> の後に <code>曜</code> が続く場合は食べない（次の曜日の先頭だから）。<br>
-さらに strip 後の <code>月-金日</code> を <code>月-金・日</code> に分離する追加ルールが必要になった。
-</blockquote>
-
-<h3>Phase 3: 区切り文字の正規化</h3>
-<p><strong>なぜ必要か</strong>: parseHours は <code>曜日:時間</code> の形だけを認識する。
-しかし入力データでは曜日と時間の区切りに以下が使われている:</p>
-<ul>
-  <li>コロン <code>:</code> （標準）</li>
-  <li>スペース <code>月-金 9:00</code></li>
-  <li>直接結合 <code>月-金9:00</code></li>
-  <li>スラッシュ <code>月-金/9:00</code></li>
-  <li>セミコロン <code>月-金;9:00</code></li>
-  <li>括弧 <code>(月火金)9:00</code>、<code>月火木）9:15</code></li>
-  <li>角括弧 <code>［月-金］9:00</code>、<code>【月】9:00</code></li>
-</ul>
-<p>すべて <code>曜日:時間</code> の形に統一する。</p>
-<p>セグメント間の区切りも同様:</p>
-<ul>
-  <li>カンマ <code>,</code>（標準）</li>
-  <li>スラッシュ <code>月-金:9:00/土:9:00</code></li>
-  <li>ピリオド <code>月-金:8:30.土:8:30</code></li>
-  <li>スペース <code>月-金:9:00 土:9:00</code></li>
-  <li>句点 <code>｡</code></li>
-  <li>直接結合 <code>月-金:9:00-18:00土:9:00-13:00</code></li>
-</ul>
-
-<h3>Phase 4: 時刻フォーマット修正</h3>
-<table>
-<tr><th>ルール</th><th>入力例</th><th>出力</th><th>なぜ必要か</th></tr>
-<tr><td>3-4桁時刻</td><td><code>1800</code> <code>900</code></td><td><code>18:00</code> <code>9:00</code></td><td>コロン省略</td></tr>
-<tr><td>分省略</td><td><code>9-18:00</code></td><td><code>9:00-18:00</code></td><td>開始時刻の<code>:00</code>省略</td></tr>
-<tr><td><code>.</code>→<code>:</code></td><td><code>18.30</code></td><td><code>18:30</code></td><td>ピリオドが時刻区切り</td></tr>
-<tr><td>ダブルコロン</td><td><code>水::9:00</code></td><td><code>水:9:00</code></td><td>タイプミス</td></tr>
-<tr><td>連続時間帯</td><td><code>14:0015:00</code></td><td><code>14:00 15:00</code></td><td>区切りなし</td></tr>
-</table>
-
-<h3>Phase 5: 休業日情報の除去</h3>
-<p><strong>なぜ除去するか</strong>: パーサーの出力は <code>{days, open, close}</code> の配列。
-「休み」を表現する型がない。残すとパース失敗になり、
-本来パースできる営業時間まで道連れで生データ表示になる。
-除去すれば営業日だけ構造化でき、休業日は「スケジュールに載っていない＝休み」として暗黙表現される。</p>
-
-<pre><code>月-金:9:00-18:00,土日祝休み      → 月-金:9:00-18:00
-月-金:9:00-18:00,日祝:定休       → 月-金:9:00-18:00
-月-金:9:00-18:00,休:日祝         → 月-金:9:00-18:00
-月-金:9:00-18:00 日              → 月-金:9:00-18:00（末尾の裸の曜日=休み）
-月-金:9:00-18:00,水日祝は        → 月-金:9:00-18:00</code></pre>
-
-<h3>Phase 6: 第N曜日（ordinal day）の処理</h3>
-<p><strong>なぜスキップか</strong>: <code>第1・3土曜:9:00-12:00</code> は「月の第1・第3土曜だけ営業」の意味。
-週次スケジュール（<code>{days, open, close}</code>）では「第何週の何曜日」を表現できない。</p>
-
-<p>最初は「括弧内を strip して通常曜日として扱う」（＝毎週土曜として表示）案で実装した。
-しかし<strong>ユーザーから「これは不正。情報の意味が変わる」と指摘</strong>を受けた。
-「第1・3土曜のみ」を「毎週土曜」と表示すると、第2・4・5土曜に来局してしまう人が出る。
-薬のアクセスに関わる情報なので、<strong>間違いより欠落の方がまし</strong>というのが設計判断。</p>
-
-<p>正規化段階では:</p>
-<ul>
-  <li>漢数字→算用数字: <code>第一土</code> → <code>第1土</code></li>
-  <li>ordinalセパレータ統一: <code>第1,3,5</code> / <code>第1.3.5</code> → <code>第1・3・5</code></li>
-  <li>括弧内ordinal+時間帯: <code>(第2,4木:9:00-19:30)</code> → 除去</li>
-</ul>
-
-<p>parseHours段階では:</p>
-<ul>
-  <li><code>土(第1-3):8:30-18:00</code> → 土をスキップ（第N限定なので毎週ではない）</li>
-  <li><code>水・土(第1・3・4):9:00-13:00</code> → 水だけ残す、土(第1・3・4)はスキップ</li>
-  <li><code>月-金,第1・3・5土:9:00-19:00</code> → 月-金だけ残す、第1・3・5土はスキップ</li>
-</ul>
-
-<blockquote>
-<strong>設計判断</strong>: 情報がないことは許容できるが、<strong>誤った情報を表示することは許容できない</strong>。
-「この薬局は土曜も営業」と誤解させるより、土曜の情報が欠けている方がましである。
-</blockquote>
-
-<hr>
-
-<h2>splitHoursSegments(): なぜ単純なsplitではダメか</h2>
-<p><strong>最初は <code>.split(",")</code> だけだった。</strong> しかしカンマの意味が文脈で変わるため、
-単純分割だと壊れるケースが大量に見つかった:</p>
-<ol>
-  <li><strong>セグメント区切り</strong>: <code>月-金:9:00-18:00,土:9:00-13:00</code>（月-金と土は別グループ）</li>
-  <li><strong>時間帯区切り</strong>: <code>月-金:9:00-13:00,14:00-18:00</code>（午前と午後の2部制）</li>
-  <li><strong>曜日列挙</strong>: <code>月,水,金:9:00-18:00</code>（月・水・金は同じ時間）</li>
-</ol>
-<p>アルゴリズム:</p>
-<ol>
-  <li>まず時刻の後に曜日が来る境界で分割（<code>9:00-18:00土:</code> → 2つのセグメント）</li>
-  <li>各セグメント内でカンマ分割し、以下のヒューリスティクスでマージ:
-    <ul>
-      <li>「曜日+時間」→ 新しいセグメント</li>
-      <li>「時間のみ」→ 直前セグメントに追加（午前/午後の2部制）</li>
-      <li>「曜日のみ」→ 次の要素とマージ（<code>月,水,金:9:00</code> → <code>月・水・金:9:00</code>）</li>
-    </ul>
-  </li>
-</ol>
-
-<hr>
-
-<h2>parseTimeRange(): 時刻バリデーション</h2>
-<p><strong>なぜ 29:59 まで許容するか</strong>: 日本の慣習として深夜営業を <code>25:00</code>（= 翌1:00）と表記する。
-<code>24:00</code> 以降を弾くと正当なデータを拒否してしまう。上限 29:59 は実用上十分。</p>
-
-<p><strong>なぜバリデーションが必要か</strong>: 元データにタイプミスがある:</p>
-<ul>
-  <li><code>8:30-6:00</code> — おそらく <code>8:30-16:00</code> か <code>8:30-18:00</code></li>
-  <li><code>9:00-1:30</code> — おそらく <code>9:00-13:00</code></li>
-</ul>
-<p>バリデーションなしだと <code>80:30</code> や <code>88:50</code> も通ってしまう（実際にあった）。
-hours 0-29, minutes 0-59 の範囲チェックで弾き、生データ表示にフォールバックする。</p>
-
-<hr>
-
-<h2>expandDayRange(): wrap-around対応</h2>
-<p><strong>なぜ do-while か</strong>: <code>月-日</code> は「月曜から日曜まで = 全7日」。
-内部の曜日番号は <code>日=0, 月=1, ..., 土=6</code> なので、
-<code>月(1)-日(0)</code> は <code>1→2→3→4→5→6→0</code> と wrap する。</p>
-<p>初期実装は <code>for (i=start; i&lt;=end; i++)</code> だった。
-<code>月-日</code> の場合 <code>1&lt;=0</code> が即 false → 空配列 → パース失敗になるバグがあった。
-<code>do-while</code> + modular arithmetic に修正して wrap-around を正しく処理する。</p>
-
-<hr>
-
-<h2>parseDaySpecExtended(): 複合曜日指定</h2>
-<p><code>parseDaySpec()</code> は単純パターン（<code>月-金</code> or <code>月・火・木</code>）のみ処理。
-<code>parseDaySpecExtended()</code> は以下の複合パターンに対応:</p>
-<ul>
-  <li>range + 個別: <code>月-水・金</code> → [月,火,水,金]</li>
-  <li>連続文字: <code>月火水金</code> → [月,火,水,金]（<code>・</code>なし列挙）</li>
-  <li>カンマ区切り: <code>月,火,水,金</code> → [月,火,水,金]</li>
-  <li>混合: <code>月-水,金,土日祝</code> → [月,火,水,金,土,日]（祝はスキップ）</li>
-</ul>
-
-<hr>
-
-<h2>残り2.9%がパースできない理由</h2>
-<p>パース不能な292件の主な原因:</p>
-<table>
-<tr><th>原因</th><th>例</th><th>件数（概算）</th></tr>
-<tr><td>括弧内の例外条件</td><td><code>月～金：9:00-17:00、（13:00-14:00は閉局）</code></td><td>~50</td></tr>
-<tr><td>曜日ごとの個別記述（タブ区切り）</td><td><code>月\t09:00～19:00火\t09:00～19:00...</code></td><td>~20</td></tr>
-<tr><td>URL</td><td><code>https://www.example.com</code></td><td>数件</td></tr>
-<tr><td>時間帯なし</td><td><code>月-金:</code></td><td>数件</td></tr>
-<tr><td>自然言語の条件</td><td><code>お客様感謝デーを除く</code> <code>隔週で17:00まで</code></td><td>~30</td></tr>
-<tr><td>括弧の対応不良</td><td><code>土(第２，4:8:30-17:00)</code></td><td>~20</td></tr>
-<tr><td>データ不良</td><td><code>9:00-8:00</code> <code>8:30-6:00</code></td><td>~10</td></tr>
-</table>
-<p>これらは個別対応のコスト（コード複雑化）に対してカバー率の改善が小さいため、
-生データ表示のフォールバックで対応している。</p>
-
-<hr>
-
-<h2>コード上の注意点</h2>
-
-<h3>正規化ルールの順序依存</h3>
-<p>多くのルールは前のルールの出力に依存する。例:</p>
-<ol>
-  <li><code>時</code>→<code>:00</code> 変換は曜日strip後に実行する必要がある（<code>金9時</code> → <code>金9:00</code> → <code>金:9:00</code>）</li>
-  <li>コロン挿入（<code>金9:00</code> → <code>金:9:00</code>）は<code>時</code>変換後に再実行する必要がある</li>
-  <li>チルダ→ダッシュ変換も<code>時</code>変換後に再実行（<code>9:00~18:00</code> が新たに生成される）</li>
-  <li>休業日stripは<code>お休み</code>→<code>休み</code>変換の後に実行する</li>
-</ol>
-<p><strong>ルールの順序を変更する場合は、全データでの回帰テストが必須。</strong></p>
-
-<h3>parseHoursの設計方針: なぜ部分パースを返さないか</h3>
-<p>パース不能なセグメントに遭遇した場合、<strong>全体を失敗</strong>にする（<code>return null</code>）。</p>
-<p><strong>理由</strong>: <code>月-金:9:00-18:00,土:???,日:9:00-14:00</code> で土だけスキップして月-金+日を返すと、
-ユーザーは「この薬局は土曜やっていない」と誤解する。実際には土曜も営業しているかもしれない。
-全体失敗→生データ表示の方が、ユーザーが自分の目で判断できる。</p>
-
-<p>例外的に graceful skip するのは、スキップしても情報が歪まないケース:</p>
-<ul>
-  <li>「休み」セグメント（もともと営業していない）</li>
-  <li>祝日セグメント（週次スケジュールの対象外）</li>
-  <li>ordinalセグメント（第N限定は週次で表現不能、スキップが正解）</li>
-  <li>不正な時間帯（データのタイプミス）</li>
-</ul>
-
-<h3>テスト方法</h3>
-<pre><code># カバー率テスト
-node -e '
-const code = require("fs").readFileSync("docs/app.js","utf8");
-const endIdx = code.indexOf("function timeToMinutes");
-global.document = {getElementById:()=&gt;null};
-eval(code.substring(0, endIdx));
-const data = require("./docs/data.json").data;
-let total=0, ok=0;
-for (const r of data) {
-  if (!r.hours?.trim()) continue;
-  total++;
-  const p = parseHours(r.hours);
-  if (p?.schedule?.length) ok++;
-}
-console.log(ok + "/" + total + " = " + (ok/total*100).toFixed(1) + "%");
-'</code></pre>
-
-<hr>
-
-<h2>改修履歴</h2>
-<table>
-<tr><th>コミット</th><th>内容</th><th>カバー率</th></tr>
-<tr><td>3c3c685</td><td>初版パーサー</td><td>89.4%</td></tr>
-<tr><td>4fb20eb</td><td>6項目の正規化改善</td><td>95.7%</td></tr>
-<tr><td>39c4597</td><td>第N曜日対応</td><td>96.6%</td></tr>
-<tr><td>03987aa</td><td>土(第N)スキップ修正（情報歪み防止）</td><td>96.3%</td></tr>
-<tr><td>0580d00</td><td>ordinal処理リファクタ</td><td>96.9%</td></tr>
-<tr><td>8d48a6a</td><td>深層検証バグ修正</td><td>97.1%</td></tr>
-<tr><td>04853e7</td><td>金曜日曜の貪欲マッチ修正</td><td>97.1%</td></tr>
-</table>
-
+<div id="content">読み込み中...</div>
+<script>
+fetch('HOURS_PARSER.md')
+  .then(function(r) { return r.text(); })
+  .then(function(md) {
+    md = md.replace(/^---\n[\s\S]*?\n---\n/, '');
+    document.getElementById('content').innerHTML = marked.parse(md);
+  })
+  .catch(function() {
+    document.getElementById('content').textContent = '読み込みに失敗しました。';
+  });
+</script>
 </body>
 </html>

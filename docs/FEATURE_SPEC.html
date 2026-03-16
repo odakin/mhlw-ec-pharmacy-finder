@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>機能仕様書 — mhlw-ec-pharmacy-finder</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -29,8 +30,10 @@ hr { border: none; border-top: 1px solid #d0d7de; margin: 2em 0; }
 blockquote { border-left: 4px solid #d0d7de; margin: 1em 0; padding: 0.5em 1em; color: #57606a; }
 strong { font-weight: 600; }
 ul, ol { padding-left: 2em; }
+del { color: #888; }
 .nav { margin-bottom: 1.5em; font-size: 0.9em; }
 .nav a { margin-right: 1em; }
+#content { min-height: 200px; }
 </style>
 </head>
 <body>
@@ -39,144 +42,17 @@ ul, ol { padding-left: 2em; }
   <a href="HOURS_PARSER.html">📄 パーサー設計</a>
   <a href="https://github.com/odakin/mhlw-ec-pharmacy-finder">📦 GitHub</a>
 </div>
-
-<h1>mhlw-ec-pharmacy-finder 機能追加指示書</h1>
-
-<h2>概要</h2>
-<p>
-緊急避妊薬の薬局検索サイト <a href="https://odakin.github.io/mhlw-ec-pharmacy-finder/">https://odakin.github.io/mhlw-ec-pharmacy-finder/</a> に以下の機能を追加する。
-競合サイト（<a href="https://www.kusurinomadoguchi.com/s?is_ecp=1">EPARKくすりの窓口</a>）との差分を埋めつつ、既存の強み（厚労省公式データ10,000件超、女性薬剤師フィルター、事前連絡不要フィルター等）は維持する。
-</p>
-<p><strong>制約</strong>:</p>
-<ul>
-  <li>GitHub Pages での静的ホスティング。サーバーサイド処理なし</li>
-  <li>外部APIキーが必要なサービス（Google Maps Platform等）は避け、無料・APIキー不要のものを優先</li>
-  <li>既存のUI/UXを壊さない。既存機能（都道府県選択、フリーワード検索、チェックボックスフィルター）はそのまま残す</li>
-</ul>
-
-<hr>
-
-<h2>機能4: Google Mapリンク（各薬局への外部導線）✅ 実装済み</h2>
-<ul>
-  <li>各薬局カードに「📍 Google Mapで見る」リンクを追加済み（コミット d83b795）</li>
-  <li>リンク形式: <code>https://www.google.com/maps/search/?api=1&amp;query={encodeURIComponent(薬局名 + ' ' + 住所)}</code></li>
-  <li>APIキー不要。クリックで写真・口コミ・ストリートビュー・ナビが確認できる</li>
-</ul>
-
-<hr>
-
-<h2>機能1: 地図表示 ✅ 実装済み（コミット 514ad56, 3c3c685）</h2>
-
-<h3>要件</h3>
-<ul>
-  <li>検索結果の薬局を地図上にピン表示する</li>
-  <li>ピンをクリック/タップで薬局名・住所・電話番号等のポップアップを表示</li>
-  <li>ポップアップ内に「Google Mapで見る」リンクを含める</li>
-  <li>検索結果のリスト表示と地図表示を切り替え可能にする（タブまたはトグル）</li>
-  <li>モバイルでも使いやすいレスポンシブ対応</li>
-</ul>
-
-<h3>技術方針</h3>
-<ul>
-  <li><strong>地図エンジン</strong>: Leaflet.js + OpenStreetMap タイル（無料、APIキー不要）</li>
-  <li><strong>ジオコーディング</strong>: 東大CSIS 簡易ジオコーディング実験
-    <ul>
-      <li>エンドポイント: <code>https://geocode.csis.u-tokyo.ac.jp/cgi-bin/simple_geocode.cgi?charset=UTF8&amp;addr={住所}</code></li>
-      <li>無料、APIキー不要、ユーザー登録不要</li>
-      <li>番地・号レベルの高精度（iLvl 5〜8）</li>
-      <li>検証済み: 10件中9件で番地レベル以上の精度を確認。Nominatim は日本語住所で全滅だったため不採用</li>
-    </ul>
-  </li>
-  <li><strong>キャッシュ設計</strong>: <code>data/geocode_cache.json</code>（append-only）
-    <ul>
-      <li>構造: <code>{ "66": {"lat": 43.762955, "lng": 142.359726, "lvl": 8, "addr": "元住所"}, ... }</code></li>
-      <li>id は厚労省の「薬局等番号」で安定</li>
-      <li>削除された薬局のデータも保持（再登録時に再利用可能）</li>
-      <li>新規/住所変更分のみ CSIS に問い合わせ。CSIS 障害時はスキップ（GitHub Actions の日次実行で自動リトライ）</li>
-    </ul>
-  </li>
-  <li><strong>差分更新</strong>: 0.5秒間隔。初回10,128件 ≒ 約85分。以降の定期更新は新規数十件 ≒ 数秒</li>
-  <li><strong>フロントエンド配信</strong>: ビルド時に <code>docs/geocode_cache.json</code> にコピー。地図タブ表示時のみ fetch（軽さ維持）</li>
-  <li><strong>クラスタリング</strong>: Leaflet.markercluster（CDN読み込み）</li>
-  <li>検索結果が200件超の場合はガイド表示。ただし表示はブロックしない</li>
-  <li>初期表示（検索前）では地図は非表示</li>
-</ul>
-
-<hr>
-
-<h2>機能2: 現在地からの距離・近い順ソート ✅ 実装済み（コミット 3c3c685）</h2>
-
-<h3>要件</h3>
-<ul>
-  <li>「現在地から近い順」ソートボタンを追加</li>
-  <li>ボタン押下時にブラウザの Geolocation API で現在地を取得し、各薬局との距離を計算してソート</li>
-  <li>各薬局の行に「約○○km」の距離表示を追加</li>
-  <li>位置情報の取得に失敗した場合（拒否/非対応）は適切なエラーメッセージを表示し、既存のソート（表示順）にフォールバック</li>
-  <li>地図表示モードでは、現在地もピン（色を変える）で表示する</li>
-</ul>
-
-<h3>技術方針</h3>
-<ul>
-  <li><code>navigator.geolocation.getCurrentPosition()</code> を使用</li>
-  <li>距離計算は Haversine 公式（直線距離）で十分。ルート距離は不要</li>
-  <li>位置情報の許可ダイアログが出ることをユーザーに事前に伝えるUI</li>
-  <li>ソート切替: デフォルト（元の順序）/ 近い順 をトグルで切り替え</li>
-  <li>距離計算には緯度経度が必要なので、機能1のジオコーディングが前提</li>
-</ul>
-
-<hr>
-
-<h2>機能3: 営業時間表示 ✅ 実装済み（コミット 3c3c685〜04853e7、パーサーカバー率 97.1%）</h2>
-
-<h3>課題</h3>
-<ul>
-  <li><code>hours</code> フィールドのフォーマット揺れが 6,933 種類</li>
-  <li>約80%は簡易パターンでパース可能だが、20%は自由記述</li>
-  <li>誤判定リスク（緊急避妊薬の性質上、「営業中」を信じて行ったら閉まってた、は深刻）</li>
-  <li>Google Mapリンク（機能4）でGoogle Maps上の営業情報が確認できるため、機能が重複する面もある</li>
-</ul>
-
-<h3>実装内容</h3>
-<ul>
-  <li>多段正規化パーサー（<code>~</code>→<code>-</code>、<code>月曜日</code>→<code>月</code>、<code>年中無休</code>→<code>毎日</code>、<code>平日</code>→<code>月-金</code>、<code>24時間</code>→<code>毎日:0:00-24:00</code> 等）</li>
-  <li><code>splitHoursSegments()</code>: カンマなし連結パターンを lookbehind で分割</li>
-  <li><code>parseDaySpecExtended()</code>: <code>土日祝</code>、<code>月-水・金</code>、<code>月火水金</code> 等に対応（祝はスキップ）</li>
-  <li>今日の営業状況をハイライト（営業中/営業時間外/休み）</li>
-  <li>全曜日スケジュールを折りたたみ表示</li>
-  <li>パース不能分（2.9%）は生データのまま表示。設計詳細は <a href="HOURS_PARSER.html">HOURS_PARSER.html</a> 参照</li>
-  <li>全件に「※営業状況は店舗にご確認ください」の注記</li>
-</ul>
-
-<hr>
-
-<h2>実装の優先順位</h2>
-<ol>
-  <li><del><strong>機能4</strong>（Google Mapリンク）</del> ✅ 完了（d83b795）</li>
-  <li><del><strong>機能1</strong>（地図表示）</del> ✅ 完了（514ad56, 3c3c685）</li>
-  <li><del><strong>機能2</strong>（近い順ソート）</del> ✅ 完了（3c3c685）</li>
-  <li><del><strong>機能3</strong>（営業時間表示）</del> ✅ 完了（3c3c685〜04853e7、97.1%カバー率）</li>
-</ol>
-
-<h2>データ構造（調査済み）</h2>
-<ul>
-  <li><strong>緯度経度: なし</strong> → 東大CSISでジオコーディング（番地レベル精度、無料）</li>
-  <li><strong>営業時間: あり</strong> → <code>hours</code> フィールド。6,933種のフォーマット揺れ。97.1%パース可能（<a href="HOURS_PARSER.html">HOURS_PARSER.html</a> 参照）</li>
-  <li><strong>データ読み込み</strong>: <code>docs/data.json</code> を fetch。10,128件</li>
-  <li><strong>座標データ読み込み</strong>: <code>docs/geocode_cache.json</code> を地図表示時のみ fetch（別ファイルで軽さ維持）</li>
-  <li><strong>公開ディレクトリ</strong>: <code>docs/</code>（GitHub Pages）</li>
-  <li><strong>フロントエンド</strong>: <code>docs/index.html</code> + <code>docs/app.js</code> + <code>docs/style.css</code>（バニラJS、フレームワークなし）</li>
-</ul>
-
-<hr>
-
-<h2>その他の判断</h2>
-<ul>
-  <li><strong>ネット予約連携</strong>: 薬局側のシステムが必要なため対象外</li>
-  <li><strong>薬局の写真直接表示</strong>: データソースがなく、APIコストも非現実的なため対象外。Google Mapリンク（機能4）で代替</li>
-  <li><strong>口コミ表示</strong>: 同上。Google Mapリンクで代替</li>
-  <li><strong>Nominatim</strong>: 日本語住所で全滅（10件中0件ヒット）。不採用</li>
-  <li><strong>Google Geocoding API</strong>: 高精度だが有料（~$50）。東大CSISで同等精度が無料で得られるため不採用</li>
-</ul>
-
+<div id="content">読み込み中...</div>
+<script>
+fetch('FEATURE_SPEC.md')
+  .then(function(r) { return r.text(); })
+  .then(function(md) {
+    md = md.replace(/^---\n[\s\S]*?\n---\n/, '');
+    document.getElementById('content').innerHTML = marked.parse(md);
+  })
+  .catch(function() {
+    document.getElementById('content').textContent = '読み込みに失敗しました。';
+  });
+</script>
 </body>
 </html>
