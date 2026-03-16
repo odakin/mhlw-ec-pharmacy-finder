@@ -91,8 +91,10 @@ function normalizeHoursText(raw) {
   s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2}:\d{2})/g, "$1-$2");
   // Normalize ~ to - in day ranges (月~金 -> 月-金)
   s = s.replace(/([月火水木金土日祝])~([月火水木金土日祝])/g, "$1-$2");
-  // Strip 曜日 suffix (月曜日 -> 月)
-  s = s.replace(/([月火水木金土日])曜日?/g, "$1");
+  // Strip 曜日 suffix (月曜日 -> 月, but 金曜日曜 -> 金日 not 金曜)
+  s = s.replace(/([月火水木金土日])曜(?:日(?!曜))?/g, "$1");
+  // After 曜日 strip, insert ・ when range end abuts a bare day (月-金日 -> 月-金・日)
+  s = s.replace(/([月火水木金土日])([-~])([月火水木金土日])([月火水木金土日])/g, "$1$2$3・$4");
   // 年中無休 / 全日 -> all days marker
   s = s.replace(/年中無休/g, "毎日");
   s = s.replace(/全日/g, "毎日");
