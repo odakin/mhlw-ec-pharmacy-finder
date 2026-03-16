@@ -44,7 +44,15 @@ splitHoursSegments()  ← 曜日グループごとに分割
   ↓
 parseHours()          ← 各セグメントから曜日+時間帯+祝日情報を抽出
   ↓
-構造化データ: { schedule: [...], holidaySchedule: [...], holidayClosed: bool }
+構造化データ: { schedule, holidaySchedule, holidayClosed }
+  ↓
+getHoursInfo(raw, ctx) ← 今日の営業状態を判定（祝日・深夜日跨ぎ考慮）
+  │                       ctx = getJstContext()（JST日時をバッチで1回計算）
+  │                       isJapaneseHoliday() で祝日判定
+  ↓
+{ todayRanges, isOpen, isHoliday, holidayClosed, ... }
+  ↓
+renderHoursHtml(raw, info) ← バッジ + 週間スケジュール + 祝日行の HTML 生成
 ```
 
 ## normalizeHoursText(): なぜ90段もあるのか
