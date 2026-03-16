@@ -109,6 +109,9 @@ function getJapaneseHolidays(year) {
   const autumnalDay = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
   holidays.push(d(9, autumnalDay)); // 秋分の日
 
+  // Helper: format Date to "YYYY-MM-DD" using local time (avoids toISOString UTC shift)
+  const fmt = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+
   // 振替休日 (substitute holidays): if a holiday falls on Sunday, next Monday is a holiday
   const baseSet = new Set(holidays);
   const substitutes = [];
@@ -118,8 +121,8 @@ function getJapaneseHolidays(year) {
       // Find next non-holiday weekday
       let sub = new Date(dt);
       do { sub.setDate(sub.getDate() + 1); }
-      while (baseSet.has(sub.toISOString().slice(0, 10)) || substitutes.includes(sub.toISOString().slice(0, 10)));
-      substitutes.push(sub.toISOString().slice(0, 10));
+      while (baseSet.has(fmt(sub)) || substitutes.includes(fmt(sub)));
+      substitutes.push(fmt(sub));
     }
   }
   substitutes.forEach(s => baseSet.add(s));
@@ -133,8 +136,7 @@ function getJapaneseHolidays(year) {
     if (diff === 2) {
       const mid = new Date(a);
       mid.setDate(mid.getDate() + 1);
-      const midStr = mid.toISOString().slice(0, 10);
-      if (mid.getDay() !== 0) baseSet.add(midStr); // Not Sunday (would be 振替休日 instead)
+      if (mid.getDay() !== 0) baseSet.add(fmt(mid)); // Not Sunday (would be 振替休日 instead)
     }
   }
 
@@ -457,8 +459,8 @@ function parseHours(raw) {
   const rawNorm = (raw || "").toString()
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/祝日/g, "祝");
-  const holidayClosed = /祝[・]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
-    || /[日土][・,]?祝\s*(休|閉|定休|休業|休日)/.test(rawNorm)
+  const holidayClosed = /祝[・:：]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
+    || /[日土][・,]?祝[・:：]?\s*(休|閉局|定休|休業|休日)/.test(rawNorm)
     || /休\s*[：:]\s*[月火水木金土日・,]*祝/.test(rawNorm)
     || /祝を?除く/.test(rawNorm);
 
