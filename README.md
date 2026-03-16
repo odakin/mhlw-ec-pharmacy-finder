@@ -67,7 +67,7 @@ Web UI の絞り込み:
 Web UI の機能:
 - **地図表示**: Leaflet.js + OpenStreetMap で検索結果をピン表示（マーカークラスタリング対応）
 - **近い順ソート**: ブラウザの位置情報から現在地を取得し、距離順にソート
-- **営業時間表示**: 今日の営業状況（営業中/営業時間外/休み）をハイライト + 全曜日スケジュール折りたたみ表示
+- **営業時間表示**: 今日の営業状況（営業中/営業時間外/休み）をハイライト + 全曜日スケジュール折りたたみ表示。祝日の自動判定対応（祝日休み・祝日営業時間）
 - **Google Mapリンク**: 各薬局カードから Google Map へ直接遷移（写真・口コミ・ナビ）
 
 ---
@@ -153,7 +153,7 @@ A search tool for pharmacies in Japan that sell emergency contraceptive pills (a
 - **10,000+ pharmacies** across all 47 prefectures
 - **Map view** with marker clustering (Leaflet.js + OpenStreetMap)
 - **Sort by nearest** using browser geolocation
-- **Business hours** display with today's status highlighted
+- **Business hours** display with today's status highlighted (including national holiday detection)
 - **Filters**: female pharmacist available, after-hours support, no appointment needed
 - **Google Maps link** for each pharmacy (directions, reviews, photos)
 - **Daily auto-update** via GitHub Actions
