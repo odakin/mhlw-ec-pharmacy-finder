@@ -182,8 +182,9 @@ function normalizeHoursText(raw) {
   s = s.replace(/第[\d・,.\s第]+\s*$/, "");
   // Clean up trailing/leading commas from stripping
   s = s.replace(/^[,、\s]+/, "").replace(/[,、\s]+$/, "");
-  // Handle "土(第N)" pattern - strip the ordinal qualifier, keep as regular day
-  s = s.replace(/([月火水木金土日])\s*[(（]第[^)）]*[)）]/g, "$1");
+  // Strip "土(第N)" pattern entirely - ordinal qualifier makes it non-weekly
+  s = s.replace(/[,、]\s*[月火水木金土日・]+\s*[(（]第[^)）]*[)）][^,]*/g, "");
+  s = s.replace(/^[月火水木金土日・]+\s*[(（]第[^)）]*[)）][^,]*[,、]\s*/g, "");
   s = s.trim();
   // Normalize "から" to "-" in day ranges (月から金 -> 月-金)
   s = s.replace(/([月火水木金土日])から([月火水木金土日])/g, "$1-$2");
