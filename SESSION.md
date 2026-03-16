@@ -186,6 +186,7 @@
 - [x] **祝日法改正チェックのスケジュールタスク登録** — 登録済み
   - スケジュールタスク `holiday-law-check`（毎年1月15日 10:00）
   - 法改正の有無を確認し、`getJapaneseHolidays()` の更新要否を報告
+- [x] **HOURS_PARSER.md 更新** — Phase 5 を現状の「抽出→除去」2段階に修正、アーキテクチャ図に holidaySchedule/holidayClosed 出力を反映、Jekyll frontmatter 追加
 
 ### ユーザーとの決定事項
 
