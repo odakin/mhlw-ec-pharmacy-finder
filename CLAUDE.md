@@ -23,7 +23,7 @@ scripts/
   hooks/pre-commit       → SESSION.md 更新漏れ防止フック
 line_bot/                → LINE Bot サンプル
 AGENTS.md                → コードレビューガイドライン
-FEATURE_SPEC.md          → 機能仕様書（4機能の要件・技術方針）
+docs/FEATURE_SPEC.md     → 機能仕様書（4機能の要件・技術方針、GitHub Pages で公開）
 docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（GitHub Pages で公開）
 ```
 
@@ -73,7 +73,7 @@ git config core.hooksPath scripts/hooks
 - `docs/` 配下が本番。変更はここに反映する
 - 厚労省サーバーへの頻繁なアクセスは避ける
 
-## 実装済み機能（FEATURE_SPEC.md 参照）
+## 実装済み機能（docs/FEATURE_SPEC.md 参照）
 
 4機能すべて実装・プッシュ済み:
 
