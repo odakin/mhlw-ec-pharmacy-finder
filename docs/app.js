@@ -84,6 +84,7 @@ function normalizeHoursText(raw) {
     .replace(/[－‐−⁻₋–—ー―ｰ]/g, "-")
     .replace(/[､、，]/g, ",")
     .replace(/[・･•]/g, "・")
+    .replace(/．/g, ".")
     .replace(/\s+/g, " ")
     .trim();
   // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00)
@@ -110,6 +111,8 @@ function normalizeHoursText(raw) {
   s = s.replace(/(\d{1,2}:\d{2})\/(\d{1,2}:\d{2})/g, "$1 $2");
   // Normalize / as segment separator (月-金:9:00-18:00/土:9:00-13:00)
   s = s.replace(/(\d{1,2}:\d{2})\/([月火水木金土日祝])/g, "$1,$2");
+  // Normalize / between day spec and time (月-金/8:30-18:00 -> 月-金:8:30-18:00)
+  s = s.replace(/([月火水木金土日祝])\/(\d{1,2}:\d{2})/g, "$1:$2");
   // Normalize 時 notation (9時-18時 -> 9:00-18:00)
   s = s.replace(/(\d{1,2})時(\d{2})分?/g, "$1:$2");
   s = s.replace(/(\d{1,2})時/g, "$1:00");
@@ -156,35 +159,17 @@ function normalizeHoursText(raw) {
   // Strip "祝を除く" / "祝除く" prefix
   s = s.replace(/祝を?除く/g, "");
   // Normalize 漢数字 in ordinal day specs (第一土 -> 第1土, 第二 -> 第2, etc.)
-  s = s.replace(/([第・])([一二三四五])/g, (_, p, k) => p + ("一二三四五".indexOf(k) + 1));
-  // Strip ordinal-related suffixes (以外, ※)
-  s = s.replace(/以外/g, "");
+  // Also handle comma-preceded: ,四日 -> ,4日
+  s = s.replace(/([第・,])([一二三四五])/g, (_, p, k) => p + ("一二三四五".indexOf(k) + 1));
+  // Normalize ordinal separators: 第1,3,5 / 第1.3.5 / 第1,第3,第5 -> 第1・3・5
+  // Must run BEFORE comma-based segment splitting
+  s = s.replace(/第\d+(?:[,.]\s*第?\d+)+/g, (m) => "第" + m.replace(/[,.]\s*第?/g, "・").replace(/^第/, ""));
+  // Normalize ordinal-related markers for segment-level handling in parseHours
   s = s.replace(/※/g, ",");
-  // Strip ordinal day segments (第N土:time, 第1・3・5土:time, etc.) - can't represent in weekly schedule
-  // Must run BEFORE splitHoursSegments to avoid comma/period splitting issues
-  // Handles: 第1土:9:00-13:00  第1,3,5土:9:00-18:00  第1.3.5土:8:30-13:30  第2・4土:9:00-14:00
-  // Also handles: 土(第1-3):8:30-18:00  土(第4):9:00-13:00  水・土(第1・3・4):9:00-13:00
-  // Remove ordinal segments: 第1土:9:00-13:00, 第1・第3土:9:00-14:00, 第1.3.5土:8:30-13:30
-  // The ordinal prefix pattern: 第 followed by digits/separators/第, then a day char
-  const ordPfx = "第[\\d・,.\\s第\\-]+[月火水木金土日]";
-  // With time: ordinal prefix + colon + time range(s)
-  const ordWithTime = new RegExp(ordPfx + "\\s*[:]\\s*\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2}(\\s+\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2})*", "g");
-  // Strip concatenated ordinal segments (after time, no comma)
-  s = s.replace(ordWithTime, "");
-  // Strip comma-separated ordinal segments (with or without time)
-  const ordSeg = new RegExp("[,、]\\s*" + ordPfx + "[^,]*", "g");
-  s = s.replace(ordSeg, "");
-  // Strip ordinal at start of string
-  const ordStart = new RegExp("^" + ordPfx + "[^,]*[,、]\\s*", "g");
-  s = s.replace(ordStart, "");
-  s = s.replace(new RegExp("^" + ordPfx + "[^,]*$", "g"), "");
-  // Strip dangling ordinal fragments (第1 without day char at end)
-  s = s.replace(/第[\d・,.\s第]+\s*$/, "");
-  // Clean up trailing/leading commas from stripping
-  s = s.replace(/^[,、\s]+/, "").replace(/[,、\s]+$/, "");
-  // Strip "土(第N)" pattern entirely - ordinal qualifier makes it non-weekly
-  s = s.replace(/[,、]\s*[月火水木金土日・]+\s*[(（]第[^)）]*[)）][^,]*/g, "");
-  s = s.replace(/^[月火水木金土日・]+\s*[(（]第[^)）]*[)）][^,]*[,、]\s*/g, "");
+  // Normalize お休み -> 休み
+  s = s.replace(/お休み/g, "休み");
+  // Strip inline parenthesized ordinal overrides: (第2,4木:9:00-19:30) or (第2,4木曜:9:00-19:30)
+  s = s.replace(/[(（]第[^)）]*\d{1,2}:\d{2}[^)）]*[)）]/g, "");
   s = s.trim();
   // Normalize "から" to "-" in day ranges (月から金 -> 月-金)
   s = s.replace(/([月火水木金土日])から([月火水木金土日])/g, "$1-$2");
@@ -205,8 +190,8 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日祝])が(\d{1,2}:\d{2})/g, "$1:$2");
   // Normalize ） as separator (月火木）9:15 -> 月火木:9:15)
   s = s.replace(/([月火水木金土日祝])[）)]\s*(\d{1,2}:\d{2})/g, "$1:$2");
-  // Normalize ［］ brackets (［月］-> 月:)
-  s = s.replace(/[［\[]\s*([月火水木金土日祝・,\-~]+)\s*[］\]]\s*(\d{1,2}:\d{2})/g, "$1:$2");
+  // Normalize ［］ and 【】 brackets (［月］-> 月:, 【月】-> 月:)
+  s = s.replace(/[［\[【]\s*([月火水木金土日祝・,\-~]+)\s*[］\]】]\s*(\d{1,2}:\d{2})/g, "$1:$2");
   // Normalize (月火金) type brackets - before time or before colon
   s = s.replace(/[（(]\s*([月火水木金土日祝・,\-~]+)\s*[）)]\s*[:]\s*/g, "$1:");
   s = s.replace(/[（(]\s*([月火水木金土日祝・,\-~]+)\s*[）)]\s*(\d{1,2}:\d{2})/g, "$1:$2");
@@ -287,63 +272,60 @@ function splitHoursSegments(text) {
   // "月-金:9:00-18:00 土:9:00-13:00" or "月-金:9:00-18:00土:9:00-13:00"
   let pieces = text.split(/(?<=\d:\d{2})\s*(?=[月火水木金土日祝毎第])/);
   pieces = pieces.map((s) => s.trim()).filter(Boolean);
-  if (pieces.length > 1) {
-    // Each piece may still have internal commas for time ranges
-    // "月-金:9:00-14:00,15:00-19:00" -> keep together
-    return pieces.map((p) => {
-      // Replace commas between time ranges (not before day chars) with spaces
-      return p.replace(/,(\d{1,2}:\d{2})/g, " $1");
-    });
-  }
 
-  // Step 2: Comma-based split with smart merging
-  const raw = text.split(",").map((s) => s.trim()).filter(Boolean);
-  if (raw.length <= 1) return raw;
+  // If first-pass split found multiple pieces, apply comma-based splitting to each
+  // (a piece may still contain "月-金:9:00-18:00,土:9:00-13:00")
+  const toSplit = pieces.length > 1 ? pieces : [text];
+  const allSegments = [];
+  for (const piece of toSplit) {
+    const raw = piece.split(",").map((s) => s.trim()).filter(Boolean);
+    if (raw.length <= 1) { allSegments.push(piece); continue; }
 
-  // Merge logic: a comma-separated part that starts with a day char and contains ":"
-  // is a new day-group. A part that starts with a time is an additional time range.
-  // A part that is ONLY day chars (like "金" in "月-水,金:9:00-18:00") should merge
-  // with the NEXT part as a day spec prefix.
-  const merged = [];
-  let dayPrefix = "";
-  for (let i = 0; i < raw.length; i++) {
-    const part = raw[i];
-    const hasDayAndTime = /^[月火水木金土日祝毎].*:.*\d{1,2}:\d{2}/.test(part);
-    const isDayOnly = /^[月火水木金土日祝\-~・]+$/.test(part);
-    const isTimeOnly = /^\d{1,2}:\d{2}/.test(part);
+    // Merge logic: a comma-separated part that starts with a day char and contains ":"
+    // is a new day-group. A part that starts with a time is an additional time range.
+    // A part that is ONLY day chars (like "金" in "月-水,金:9:00-18:00") should merge
+    // with the NEXT part as a day spec prefix.
+    const merged = [];
+    let dayPrefix = "";
+    for (let i = 0; i < raw.length; i++) {
+      const part = raw[i];
+      const hasDayAndTime = /^[月火水木金土日祝毎第].*:.*\d{1,2}:\d{2}/.test(part);
+      const isDayOnly = /^[月火水木金土日祝第\d\-~・]+$/.test(part);
+      const isTimeOnly = /^\d{1,2}:\d{2}/.test(part);
 
-    if (dayPrefix) {
-      // Prepend accumulated day prefix
-      if (hasDayAndTime || isDayOnly) {
-        // "月-水" + ",金:" -> merge into day spec "月-水・金:..."
-        const combined = dayPrefix + "・" + part;
-        if (/\d{1,2}:\d{2}/.test(combined)) {
-          merged.push(combined.replace(/,(\d{1,2}:\d{2})/g, " $1"));
+      if (dayPrefix) {
+        // Prepend accumulated day prefix
+        if (hasDayAndTime || isDayOnly) {
+          // "月-水" + ",金:" -> merge into day spec "月-水・金:..."
+          const combined = dayPrefix + "・" + part;
+          if (/\d{1,2}:\d{2}/.test(combined)) {
+            merged.push(combined.replace(/,(\d{1,2}:\d{2})/g, " $1"));
+            dayPrefix = "";
+          } else {
+            dayPrefix = dayPrefix + "・" + part;
+          }
+        } else if (isTimeOnly) {
+          merged.push(dayPrefix + ":" + part);
           dayPrefix = "";
         } else {
-          dayPrefix = dayPrefix + "・" + part;
+          merged.push(dayPrefix);
+          dayPrefix = "";
+          merged.push(part);
         }
-      } else if (isTimeOnly) {
-        // Day prefix followed by time? "月-水,金" then "9:00-18:00" - shouldn't happen
-        merged.push(dayPrefix + ":" + part);
-        dayPrefix = "";
+      } else if (isDayOnly) {
+        dayPrefix = part;
+      } else if (hasDayAndTime) {
+        merged.push(part.replace(/,(\d{1,2}:\d{2})/g, " $1"));
+      } else if (isTimeOnly && merged.length) {
+        merged[merged.length - 1] += " " + part;
       } else {
-        merged.push(dayPrefix);
-        dayPrefix = "";
         merged.push(part);
       }
-    } else if (isDayOnly) {
-      dayPrefix = part;
-    } else if (hasDayAndTime) {
-      merged.push(part.replace(/,(\d{1,2}:\d{2})/g, " $1"));
-    } else if (isTimeOnly && merged.length) {
-      merged[merged.length - 1] += " " + part;
-    } else {
-      merged.push(part);
     }
+    if (dayPrefix) merged.push(dayPrefix);
+    allSegments.push(...merged);
   }
-  if (dayPrefix) merged.push(dayPrefix);
-  return merged;
+  return allSegments;
 }
 
 function parseDaySpecExtended(spec) {
@@ -406,19 +388,43 @@ function parseHours(raw) {
 
   const segments = splitHoursSegments(text);
 
-  for (const seg of segments) {
+  for (let seg of segments) {
+    // Handle (第N) qualifiers on day specs
+    // "水・土(第1・3・4):9:00-13:00" -> strip the qualified day, keep others: "水:9:00-13:00"
+    // "土(第1-3):8:30-18:00" -> single day with ordinal, skip entire segment
+    // Skip ordinal+closed segments (第3土休み, 第3土お休み, etc.)
+    if (/^第[\d・]+[月火水木金土日].*(休み?|閉局|定休)/.test(seg)) continue;
+
+    if (/[(（]第/.test(seg)) {
+      // Remove "day(第...)" portions: 土(第1-3) -> empty, 水・土(第1・3・4) -> 水
+      seg = seg.replace(/[月火水木金土日]\s*[(（]第[^)）]*[)）]/g, "");
+      seg = seg.replace(/^[・,\s]+/, "").replace(/[・,\s]+$/, "");
+      seg = seg.replace(/[・,]+[・,]/g, "・"); // clean double separators
+      if (!seg || !/[月火水木金土日]/.test(seg)) continue; // nothing left -> skip
+      // After stripping ordinal qualifiers, insert : if day char directly precedes time
+      seg = seg.replace(/([月火水木金土日])(\d{1,2}:\d{2})/g, "$1:$2");
+    }
+
     // Pattern: daySpec:timeRange(s)
     const m = seg.match(/^([月火水木金土日祝毎第\d][月火水木金土日祝毎第\d\-~・,]*)\s*[:]\s*(.+)$/);
     if (!m) return null; // can't parse -> give up on entire string
 
-    const daySpec = m[1];
+    let daySpec = m[1];
     const timePart = m[2].trim();
 
     // Skip segments indicating closed days (休み, 閉局, 休, empty)
     if (/^(休み?|閉局|定休)\s*$/.test(timePart) || !timePart) continue;
 
-    // Skip ordinal day segments (第1土, 第2・4土, etc.) - can't represent in weekly schedule
-    if (/第\d/.test(daySpec)) continue;
+    // Handle ordinal in daySpec: strip 第N portions, keep regular days
+    // "第1.3.5土" -> pure ordinal, skip entirely
+    // "月・火・木・金・第1.3.5土" -> strip ordinal, keep "月・火・木・金"
+    if (/第\d/.test(daySpec)) {
+      // Remove ordinal portions: 第 followed by digits/separators until a day char (inclusive)
+      daySpec = daySpec.replace(/第[\d・,.第\-\s]+[月火水木金土日]/g, "");
+      // Clean up separators
+      daySpec = daySpec.replace(/^[・,\s]+/, "").replace(/[・,\s]+$/, "");
+      if (!daySpec) continue; // pure ordinal segment -> skip
+    }
 
     // "毎日" -> all days
     const days = (daySpec === "毎日" || daySpec === "毎")
