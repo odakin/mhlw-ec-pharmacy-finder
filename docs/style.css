@@ -1,8 +1,9 @@
 /* Minimal, readable styling */
 :root { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif; line-height: 1.5; }
 body { margin: 0; background: #fafafa; color: #111; }
-header, main, footer { max-width: 980px; margin: 0 auto; padding: 16px; }
+main, footer { max-width: 980px; margin: 0 auto; padding: 16px; }
 header { background: white; border-bottom: 1px solid #ddd; }
+header > .header-inner { max-width: 980px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 1.25rem; margin: 0 0 8px; }
 .meta { margin: 0 0 10px; color: #333; }
 .note { margin: 0; padding: 10px; background: #fff7e6; border: 1px solid #ffd59e; border-radius: 8px; }
@@ -30,7 +31,10 @@ li { margin: 10px 0; }
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid #bbb; background: #f4f4f4; }
 .badge.warn { border-color: #d47; background: #ffe6ef; }
-footer { color: #444; }
+footer { color: #444; border-top: 1px solid #ddd; margin-top: 8px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
+.footer-links a { color: #0b57d0; text-decoration: none; font-size: 0.85rem; }
+.footer-links a:hover { text-decoration: underline; }
 code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 
 /* Highlights bar */
