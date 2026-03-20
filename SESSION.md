@@ -243,7 +243,7 @@
 - [x] Search Console 確認（2026-03-20）— サイトマップは SC バグで放置、検索パフォーマンスは表示158回/クリック4回で順調に蓄積中
 - [x] 医療機関リスト追加 Phase 1-2: PDFパース → clinics.json 生成完了（3,107件）
 - [x] 医療機関リスト追加 Phase 3: フロントエンド統合完了
-- [x] 医療機関リスト追加 Phase 4: geocode.py 拡張（薬局+医療機関の統合ジオコーディング）
+- [x] 医療機関リスト追加 Phase 4: geocode.py 拡張（薬局+医療機関の統合ジオコーディング、3,053/3,107件成功=98.3%）
 - [x] 医療機関リスト追加 Phase 5: SEO更新（meta/FAQ/構造化データ/noscriptに医療機関を追加）
 - [x] 医療機関リスト追加 Phase 6: GitHub Actions に update_clinics.py 追加、requirements.txt に pdfplumber 追加
 - [x] **祝日対応の実装**（営業時間パーサー拡張）— コミット c3a7f62, 85870b8, d3091c7
