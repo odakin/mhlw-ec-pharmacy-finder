@@ -88,7 +88,9 @@ async function loadClinics() {
     if (USER_POS) {
       for (const r of CLINICS) {
         const geo = GEO_CACHE[r.id];
-        if (geo) r._dist = haversine(USER_POS.lat, USER_POS.lng, geo.lat, geo.lng);
+        if (geo && geo.lat && geo.lng) {
+          r._dist = haversine(USER_POS.lat, USER_POS.lng, geo.lat, geo.lng);
+        }
       }
     }
   } catch (e) {
@@ -790,6 +792,15 @@ function computeDistances() {
       r._dist = null;
     }
   }
+  // Also compute for clinics (if loaded)
+  for (const r of CLINICS) {
+    const geo = GEO_CACHE[r.id];
+    if (geo && geo.lat && geo.lng) {
+      r._dist = haversine(USER_POS.lat, USER_POS.lng, geo.lat, geo.lng);
+    } else {
+      r._dist = null;
+    }
+  }
 }
 
 function confirmAndRequestLocation() {
@@ -1396,6 +1407,12 @@ document.addEventListener("DOMContentLoaded", () => {
   el("showClinics").addEventListener("change", async () => {
     if (el("showClinics").checked && !CLINICS_LOADED) {
       await loadClinics();
+      if (!CLINICS_LOADED) {
+        // Load failed — uncheck and notify
+        el("showClinics").checked = false;
+        el("status").textContent = "医療機関データの読み込みに失敗しました。しばらくしてからお試しください。";
+        return;
+      }
     }
     doSearch(true);
   });

@@ -72,6 +72,24 @@ jobs:
           console.log('shape+content OK');
           NODE
 
+      - name: Validate docs/clinics.json (strict JSON)
+        if: hashFiles('docs/clinics.json') != ''
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const j = JSON.parse(fs.readFileSync('docs/clinics.json','utf8'));
+          if (!j || typeof j !== 'object') throw new Error('clinics.json must be an object');
+          if (!j.meta || typeof j.meta !== 'object') throw new Error('missing meta');
+          if (!Array.isArray(j.data)) throw new Error('data must be an array');
+          if (j.data.length === 0) throw new Error('clinics.json has no records');
+          const r = j.data[0];
+          for (const k of ['id','pref','name','addr']) {
+            if (!(k in r)) throw new Error(`missing key in records: ${k}`);
+          }
+          if (!r.id.startsWith('c')) throw new Error('clinic IDs must start with "c"');
+          console.log(`clinics.json OK: ${j.data.length} records`);
+          NODE
+
       - name: Update sitemap.xml lastmod
         run: |
           TODAY=$(date -I)
