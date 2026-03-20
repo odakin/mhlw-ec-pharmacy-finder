@@ -185,46 +185,34 @@
 - 更新日: 令和8年2月20日
 - 件数: 各県数十施設、全国で推定1,000〜2,000件
 
-**実装プラン（5段階）**:
+**デザイン決定: フィルターチップ・トグル方式**（2026-03-20 検討・決定）
 
-#### Phase 1: データ取得パイプライン
-- `scripts/update_clinics.py` を新規作成
-- 47 PDF を厚労省ページからダウンロード
-- `pdfplumber` で表をパース → `data/clinics.json` に出力
-- カラム: `id`, `pref`, `muni`, `name`, `zip`, `addr`, `tel`, `url`, `dept`（産科/婦人科）, `hours`, `hasStock`
-- 課題: PDF のフォーマットが都道府県間で統一されているか要検証。セル結合・改行・文字化けの可能性
+詳細プラン → `.claude/plans/starry-knitting-lollipop.md`
 
-#### Phase 2: フロントエンド統合
-- `docs/clinics.json` として配信（薬局の `data.json` とは別ファイル）
-- UI にタブまたはトグルを追加：「💊 薬局（処方箋なし）」/「🏥 医療機関（処方箋あり）」
-- 検索・フィルター・都道府県選択は共通化
-- 医療機関カードは薬局カードとフィールドが異なる（女性薬剤師→産科標榜、営業時間→対応可能時間帯、事前連絡→常時在庫）
-- ページタイトル・meta description・構造化データも更新
+- **デフォルトは薬局のみ**（現状維持、SEO維持、パフォーマンス影響ゼロ）
+- 「🏥 医療機関も表示」トグルチップを ON にすると `clinics.json` を遅延読み込みして結果に追加
+- 「近い順」ON 時は薬局・医療機関を距離で統合ソート
+- 「近い順」OFF 時は薬局を先に、医療機関を後に表示
+- 検索結果 0〜5件時にコンテキストバナー:「薬局が見つかりにくい場合、医療機関も検索できます」
+- 医療機関カードは左ボーダー等で視覚的に区別、「※医師の対面診察・処方箋が必要です」を必ず表示
+- 地図: 薬局=青マーカー、医療機関=赤マーカー
+- URL: `&clinic=1` パラメータ追加
+- `data.json` は一切変更しない、`clinics.json` を別ファイルで新規追加
+- 医療機関 ID は "c" プレフィックス付き文字列（薬局の数値IDと衝突回避）
 
-#### Phase 3: ジオコーディング
-- 医療機関の住所も東大CSIS でジオコーディング
-- `data/clinic_geocode_cache.json` → `docs/clinic_geocode_cache.json`
-- 地図に薬局（青マーカー）と医療機関（赤マーカー）を色分け表示
-- 近い順ソートは薬局・医療機関を統合して距離順
+却下した方式: タブ分離（近い順横断ソート不可）、完全統合（フィルター混在で複雑化）、別ページ（緊急時に遷移が余計）
 
-#### Phase 4: GitHub Actions 自動化
-- `update-data.yml` に clinics 更新ステップを追加
-- pdfplumber のインストール（pip install pdfplumber）
-- PDF が更新された場合のみ再パース（lastmod チェック or diff）
+**実装順序（6段階）**:
+1. Phase 1: 東京都PDFでパース品質評価（Go/No-Go判定）
+2. Phase 2: 47都道府県パース → clinics.json 生成
+3. Phase 3: フロントエンド（トグル・カード・バナー・フィルター）
+4. Phase 4: ジオコーディング + 地図統合
+5. Phase 5: SEO・sitemap・FAQ・構造化データ更新
+6. Phase 6: GitHub Actions 自動化
 
-#### Phase 5: SEO・コンテンツ更新
-- sitemap.xml に医療機関タブ用 URL を追加（`?type=clinic&pref=X`）
-- FAQ に医療機関関連のQ&Aを追加
-- noscript にも医療機関の説明を追加
-- og:description、title 等を「薬局・医療機関」に更新
+**変更対象ファイル**: `scripts/update_clinics.py`(新規), `docs/clinics.json`(新規), `docs/app.js`, `docs/index.html`, `docs/style.css`, `docs/sitemap.xml`, `scripts/geocode.py`, `.github/workflows/update-data.yml`
 
-**リスク・懸念点**:
-- PDF パースの精度（フォーマット不統一、セル結合、特殊文字）→ Phase 1 で東京都 PDF をまず試して品質を評価
-- 医療機関データは薬局ほど頻繁に更新されない可能性
-- data.json + clinics.json + geocode_cache x2 で初回ロードが重くなる → タブ切替時の遅延読み込みで対応
-- サイトのスコープ拡大に伴い、タイトルや免責事項の見直しが必要
-
-**推奨進め方**: Phase 1 を先行して PDF パース品質を評価。品質が実用的なら Phase 2〜5 を順次実装。
+**リスク**: PDF パース品質が最大の不確定要素。Phase 1 で Go/No-Go 判定。
 
 ### 残タスク
 
