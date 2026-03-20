@@ -1,6 +1,6 @@
 /* Minimal, readable styling */
 :root { font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif; line-height: 1.5; }
-body { margin: 0; background: #fafafa; color: #111; }
+body { margin: 0; background: #fafafa; color: #111; overflow-x: hidden; }
 main, footer { max-width: 980px; margin: 0 auto; padding: 16px; }
 header { background: white; border-bottom: 1px solid #ddd; }
 header > .header-inner { max-width: 980px; margin: 0 auto; padding: 16px; }
@@ -56,7 +56,7 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 /* Results toolbar */
 .results-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .results-toolbar p { margin: 0; }
-.results-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.results-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 100%; }
 
 /* View toggle */
 .view-toggle { display: inline-flex; border: 1px solid #bbb; border-radius: 8px; overflow: hidden; }
@@ -69,7 +69,7 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 #btnNearby.active { background: #111; color: white; }
 
 /* Nearby privacy notice (always visible) */
-.nearby-notice { font-size: 0.72rem; color: #888; white-space: nowrap; }
+.nearby-notice { font-size: 0.72rem; color: #888; }
 
 /* Nearby inline privacy panel */
 .nearby-panel { background: #f8fbff; border: 1px solid #c5d9f0; border-radius: 10px; padding: 14px 16px; margin-top: 8px; }
@@ -151,5 +151,5 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 @media (max-width: 600px) {
   .highlights { grid-template-columns: repeat(2, 1fr); }
   #mapContainer { height: 350px; }
-  .results-toolbar { flex-direction: column; align-items: flex-start; }
+  .results-toolbar { flex-direction: column; }
 }

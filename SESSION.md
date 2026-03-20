@@ -240,6 +240,11 @@
 ### 残タスク
 
 - [ ] 全機能のライブサイトテスト（近い順は位置情報が必要）
+- [x] **モバイル横スクロール修正** — スワイプ時に左右に動く問題を修正
+  - body に `overflow-x: hidden` 追加
+  - `.results-actions` の `flex-shrink: 0` → `flex-wrap: wrap; max-width: 100%`
+  - `.nearby-notice` の `white-space: nowrap` を除去
+  - モバイル `.results-toolbar` の `align-items: flex-start` を除去（子要素がビューポート幅を超過する原因）
 - [x] Search Console 確認（2026-03-20）— サイトマップは SC バグで放置、検索パフォーマンスは表示158回/クリック4回で順調に蓄積中
 - [x] 医療機関リスト追加 Phase 1-2: PDFパース → clinics.json 生成完了（3,107件）
 - [x] 医療機関リスト追加 Phase 3: フロントエンド統合完了
