@@ -2,6 +2,8 @@
 // Data source: MHLW list. See README for details.
 
 let DATA = [];
+let CLINICS = [];
+let CLINICS_LOADED = false;
 let META = {};
 let GEO_CACHE = {}; // id -> {lat, lng, lvl}
 let USER_POS = null; // {lat, lng} or null
@@ -63,6 +65,35 @@ function normalizeText(s) {
 function buildSearchBlob(r) {
   const parts = [r.pref, r.muni, r.name, r.addr, r.tel, r.url].map(cleanValue).filter(Boolean);
   return normalizeText(parts.join(" "));
+}
+
+async function loadClinics() {
+  if (CLINICS_LOADED) return;
+  try {
+    const resp = await fetch("clinics.json");
+    const json = await resp.json();
+    const recs = [];
+    for (const r of json.data || []) {
+      const rr = { ...r };
+      for (const k of ["pref","muni","name","addr","tel","url","hours","obgyn","stock","postal"]) {
+        if (k in rr) rr[k] = cleanValue(rr[k]);
+      }
+      rr._isClinic = true;
+      rr._blob = buildSearchBlob(rr);
+      recs.push(rr);
+    }
+    CLINICS = recs;
+    CLINICS_LOADED = true;
+    // Compute distances if user pos is known
+    if (USER_POS) {
+      for (const r of CLINICS) {
+        const geo = GEO_CACHE[r.id];
+        if (geo) r._dist = haversine(USER_POS.lat, USER_POS.lng, geo.lat, geo.lng);
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load clinics:", e);
+  }
 }
 
 function escapeHtml(s) {
@@ -921,7 +952,11 @@ function updateMap(rows) {
       ${r.hours ? `🕐 ${escapeHtml(r.hours)}<br>` : ""}
       <a href="${gmapUrl}" target="_blank" rel="noopener">📍 Google Mapで見る</a>`;
 
-    const marker = L.marker([geo.lat, geo.lng]).bindPopup(popup);
+    const markerOpts = {};
+    if (r._isClinic) {
+      markerOpts.icon = L.divIcon({ className: "clinic-marker", html: "🏥", iconSize: [24, 24], iconAnchor: [12, 12] });
+    }
+    const marker = L.marker([geo.lat, geo.lng], markerOpts).bindPopup(popup);
     MAP_MARKERS.addLayer(marker);
     bounds.push([geo.lat, geo.lng]);
   }
@@ -990,7 +1025,7 @@ function getPager() {
   return pager;
 }
 
-function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
+function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacyCount = 0, clinicCount = 0) {
   const list = el("list");
   const pager = getPager();
   list.innerHTML = "";
@@ -1003,7 +1038,11 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
   const show = rows.slice(0, limit);
   if (updateStatus) {
-    el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（${show.length.toLocaleString()} 件表示）`;
+    if (clinicCount > 0) {
+      el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（薬局 ${pharmacyCount.toLocaleString()} + 医療機関 ${clinicCount.toLocaleString()}、${show.length.toLocaleString()} 件表示）`;
+    } else {
+      el("status").textContent = `${rows.length.toLocaleString()} 件ヒット（${show.length.toLocaleString()} 件表示）`;
+    }
   }
 
   // Compute JST context once for the entire render batch
@@ -1011,26 +1050,15 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
 
   for (const r of show) {
     const li = document.createElement("li");
+    const isClinic = r._isClinic;
     const title = escapeHtml(r.name || "(名称不明)");
     const place = escapeHtml([r.pref, r.muni].filter(Boolean).join(" "));
     const addr = escapeHtml(r.addr || "");
-    const privacy = escapeHtml(r.privacy || "");
-    const notes = escapeHtml(r.notes || "");
-    const callAhead = (r.callAhead || "") === "要";
-    const afterHoursFlag = (r.afterHours || "") === "有";
 
     const tel = (r.tel || "").toString();
     const telLink = tel ? `<a href="tel:${escapeHtml(tel)}">${escapeHtml(tel)}</a>` : "";
-    const afterTel = (r.afterHoursTel || "").toString();
-    const showAfterTel = afterTel && afterTel !== tel;
-    const afterTelLink = showAfterTel ? `<a href="tel:${escapeHtml(afterTel)}">${escapeHtml(afterTel)}</a>` : "";
-
-    const pf = toInt(r.pharmacistsFemale);
-    const pm = toInt(r.pharmacistsMale);
-    const pn = toInt(r.pharmacistsNoAnswer);
-    const hasPharmacists = (pf + pm + pn) > 0;
     const url = (r.url || "").toString().trim();
-    const urlLink = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">公式/店舗ページ</a>` : "";
+    const urlLink = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">公式ページ</a>` : "";
     const gmapQuery = encodeURIComponent((r.name || "") + " " + (r.addr || ""));
     const gmapLink = `<a href="https://www.google.com/maps/search/?api=1&query=${gmapQuery}" target="_blank" rel="noopener">Google Mapで見る</a>`;
 
@@ -1039,39 +1067,78 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true) {
       ? `<span class="dist">約 ${r._dist < 1 ? (r._dist * 1000).toFixed(0) + "m" : r._dist.toFixed(1) + "km"}</span>`
       : "";
 
-    // Hours (Feature 3)
-    const hoursInfo = getHoursInfo(r.hours, jstCtx);
-    const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
-    // After-hours notice: show prominently when pharmacy is closed and has after-hours support
-    const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
-    const afterHoursNote = (isClosed && afterHoursFlag)
-      ? `<div class="after-hours-note">🌙 時間外対応あり${showAfterTel ? ` — 📞 ${afterTelLink}` : (tel ? ` — 📞 ${telLink}` : ``)}</div>`
-      : "";
-
-    li.innerHTML = `
-      <div class="card">
-        <div class="cardHead">
-          <div class="name">${title} ${distHtml}</div>
-          <div class="badges">
-            ${callAhead ? `<span class="badge warn">事前電話：要</span>` : ``}
-            ${afterHoursFlag ? `<span class="badge">時間外：有</span>` : ``}
+    if (isClinic) {
+      // Clinic card
+      const stock = (r.stock || "").toString();
+      const hasStock = stock.startsWith("有") || stock === "あり";
+      li.innerHTML = `
+        <div class="card clinic-card">
+          <div class="cardHead">
+            <div class="name">${title} ${distHtml}</div>
+            <div class="badges">
+              <span class="clinic-label">医療機関</span>
+              ${hasStock ? `<span class="badge">在庫あり</span>` : ``}
+            </div>
           </div>
+          <div class="place">${place}</div>
+          <div class="addr">${addr}</div>
+          <div class="links">
+            ${telLink ? `<span>📞 ${telLink}</span>` : ``}
+            ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
+            <span>📍 ${gmapLink}</span>
+          </div>
+          ${r.hours ? `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(r.hours)}</div>` : ``}
+          <div class="clinic-rx-note">※医師の対面診察・処方箋が必要です</div>
         </div>
-        <div class="place">${place}</div>
-        <div class="addr">${addr}</div>
-        <div class="links">
-          ${telLink ? `<span>📞 ${telLink}</span>` : ``}
-          ${afterTelLink ? `<span>🌙 時間外 ${afterTelLink}</span>` : ``}
-          ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
-          <span>📍 ${gmapLink}</span>
+      `;
+    } else {
+      // Pharmacy card (existing)
+      const privacy = escapeHtml(r.privacy || "");
+      const notes = escapeHtml(r.notes || "");
+      const callAhead = (r.callAhead || "") === "要";
+      const afterHoursFlag = (r.afterHours || "") === "有";
+      const afterTel = (r.afterHoursTel || "").toString();
+      const showAfterTel = afterTel && afterTel !== tel;
+      const afterTelLink = showAfterTel ? `<a href="tel:${escapeHtml(afterTel)}">${escapeHtml(afterTel)}</a>` : "";
+
+      const pf = toInt(r.pharmacistsFemale);
+      const pm = toInt(r.pharmacistsMale);
+      const pn = toInt(r.pharmacistsNoAnswer);
+      const hasPharmacists = (pf + pm + pn) > 0;
+
+      // Hours (Feature 3)
+      const hoursInfo = getHoursInfo(r.hours, jstCtx);
+      const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
+      const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
+      const afterHoursNote = (isClosed && afterHoursFlag)
+        ? `<div class="after-hours-note">🌙 時間外対応あり${showAfterTel ? ` — 📞 ${afterTelLink}` : (tel ? ` — 📞 ${telLink}` : ``)}</div>`
+        : "";
+
+      li.innerHTML = `
+        <div class="card">
+          <div class="cardHead">
+            <div class="name">${title} ${distHtml}</div>
+            <div class="badges">
+              ${callAhead ? `<span class="badge warn">事前電話：要</span>` : ``}
+              ${afterHoursFlag ? `<span class="badge">時間外：有</span>` : ``}
+            </div>
+          </div>
+          <div class="place">${place}</div>
+          <div class="addr">${addr}</div>
+          <div class="links">
+            ${telLink ? `<span>📞 ${telLink}</span>` : ``}
+            ${afterTelLink ? `<span>🌙 時間外 ${afterTelLink}</span>` : ``}
+            ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
+            <span>📍 ${gmapLink}</span>
+          </div>
+          ${hoursHtml}
+          ${afterHoursNote}
+          ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
+          ${privacy ? `<div class="detail"><span class="k">プライバシー</span> ${privacy}</div>` : ``}
+          ${notes ? `<div class="detail"><span class="k">備考</span> ${notes}</div>` : ``}
         </div>
-        ${hoursHtml}
-        ${afterHoursNote}
-        ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
-        ${privacy ? `<div class="detail"><span class="k">プライバシー</span> ${privacy}</div>` : ``}
-        ${notes ? `<div class="detail"><span class="k">備考</span> ${notes}</div>` : ``}
-      </div>
-    `;
+      `;
+    }
     list.appendChild(li);
   }
 
@@ -1106,6 +1173,7 @@ function syncUrlFromState() {
   if (el("hasFemale").checked) params.set("female", "1");
   if (el("onlyNotCallAhead").checked) params.set("nocall", "1");
   if (el("onlyAfterHours").checked) params.set("after", "1");
+  if (el("showClinics").checked) params.set("clinic", "1");
   const qs = params.toString();
   const url = qs ? "?" + qs : location.pathname;
   if (location.search !== (qs ? "?" + qs : "")) {
@@ -1124,6 +1192,25 @@ function restoreStateFromUrl() {
   el("hasFemale").checked = params.get("female") === "1";
   el("onlyNotCallAhead").checked = params.get("nocall") === "1";
   el("onlyAfterHours").checked = params.get("after") === "1";
+  el("showClinics").checked = params.get("clinic") === "1";
+}
+
+function showClinicBanner(pharmacyCount, clinicsAlreadyShown) {
+  // Remove existing banner
+  const old = document.querySelector(".clinic-banner");
+  if (old) old.remove();
+  // Show suggestion when few pharmacy results and clinics not toggled
+  if (pharmacyCount <= 5 && !clinicsAlreadyShown && CLINICS_LOADED) {
+    const banner = document.createElement("div");
+    banner.className = "clinic-banner";
+    banner.innerHTML = `薬局が見つかりにくい場合、医療機関（対面診療）も検索できます。<button type="button" id="btnShowClinics">🏥 医療機関も表示</button>`;
+    const toolbar = document.querySelector(".results-toolbar");
+    if (toolbar) toolbar.after(banner);
+    banner.querySelector("#btnShowClinics").addEventListener("click", () => {
+      el("showClinics").checked = true;
+      doSearch(true);
+    });
+  }
 }
 
 function doSearch(resetLimit = true) {
@@ -1132,10 +1219,12 @@ function doSearch(resetLimit = true) {
   const onlyNotCallAhead = el("onlyNotCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
+  const showClinics = el("showClinics").checked;
   const terms = q ? q.split(" ").filter(Boolean) : [];
   syncUrlFromState();
 
-  const rows = DATA.filter((r) => {
+  // Filter pharmacies
+  const pharmacyRows = DATA.filter((r) => {
     if (pref && r.pref !== pref) return false;
     if (onlyNotCallAhead && (r.callAhead || "") === "要") return false;
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
@@ -1143,6 +1232,44 @@ function doSearch(resetLimit = true) {
     if (!terms.length) return true;
     return terms.every((t) => r._blob.includes(t));
   });
+
+  // Filter clinics (if toggled on)
+  let clinicRows = [];
+  if (showClinics && CLINICS_LOADED) {
+    clinicRows = CLINICS.filter((r) => {
+      if (pref && r.pref !== pref) return false;
+      // Pharmacy-specific filters don't apply to clinics
+      if (!terms.length) return true;
+      return terms.every((t) => r._blob.includes(t));
+    });
+  }
+
+  // Merge results
+  let rows;
+  if (SORT_BY_DIST && USER_POS) {
+    rows = [...pharmacyRows, ...clinicRows];
+    rows.sort((a, b) => {
+      const da = a._dist != null ? a._dist : Infinity;
+      const db = b._dist != null ? b._dist : Infinity;
+      return da - db;
+    });
+  } else if (clinicRows.length > 0) {
+    // Interleave: distribute clinics proportionally among pharmacies
+    rows = [];
+    const P = pharmacyRows.length, C = clinicRows.length;
+    let pi = 0, ci = 0;
+    // Ratio of pharmacies per clinic (at least 1)
+    const ratio = P > 0 ? Math.max(1, Math.floor(P / C)) : 0;
+    while (pi < P || ci < C) {
+      // Insert `ratio` pharmacies, then 1 clinic
+      for (let k = 0; k < ratio && pi < P; k++) rows.push(pharmacyRows[pi++]);
+      if (ci < C) rows.push(clinicRows[ci++]);
+    }
+    // Append any remaining pharmacies
+    while (pi < P) rows.push(pharmacyRows[pi++]);
+  } else {
+    rows = pharmacyRows;
+  }
 
   if (!rows.length) {
     renderResults([], RESULTS_STEP, false);
@@ -1156,18 +1283,12 @@ function doSearch(resetLimit = true) {
     return;
   }
 
-  // Sort by distance if enabled
-  if (SORT_BY_DIST && USER_POS) {
-    rows.sort((a, b) => {
-      const da = a._dist != null ? a._dist : Infinity;
-      const db = b._dist != null ? b._dist : Infinity;
-      return da - db;
-    });
-  }
-
   CURRENT_ROWS = rows;
   if (resetLimit) CURRENT_LIMIT = RESULTS_STEP;
-  renderResults(CURRENT_ROWS, CURRENT_LIMIT, true);
+  renderResults(CURRENT_ROWS, CURRENT_LIMIT, true, pharmacyRows.length, clinicRows.length);
+
+  // Show clinic suggestion banner when few pharmacy results and clinics not yet shown
+  showClinicBanner(pharmacyRows.length, showClinics);
 
   if (VIEW_MODE === "map") updateMap(CURRENT_ROWS);
 }
@@ -1233,8 +1354,16 @@ async function init() {
 
     fillPrefOptions();
     restoreStateFromUrl();
+
+    // Load clinics if URL has clinic=1, otherwise preload in background
+    if (el("showClinics").checked) {
+      await loadClinics();
+    } else {
+      loadClinics(); // fire-and-forget preload
+    }
+
     doSearch(true);
-    if (!el("prefSelect").value && !el("q").value) {
+    if (!el("prefSelect").value && !el("q").value && !el("showClinics").checked) {
       el("status").textContent = `${DATA.length.toLocaleString()} 件の薬局データを読み込みました。条件を入れて検索できます。`;
     }
   } catch (e) {
@@ -1252,6 +1381,7 @@ document.addEventListener("DOMContentLoaded", () => {
     el("onlyNotCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
     el("hasFemale").checked = false;
+    el("showClinics").checked = false;
     SORT_BY_DIST = false;
     USER_POS = null;
     const nb = el("btnNearby");
@@ -1263,6 +1393,12 @@ document.addEventListener("DOMContentLoaded", () => {
   el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
   el("hasFemale").addEventListener("change", () => doSearch(true));
+  el("showClinics").addEventListener("change", async () => {
+    if (el("showClinics").checked && !CLINICS_LOADED) {
+      await loadClinics();
+    }
+    doSearch(true);
+  });
 
   // Nearby sort button
   el("btnNearby").addEventListener("click", () => {
