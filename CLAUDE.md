@@ -5,7 +5,8 @@
 厚生労働省が公表する「緊急避妊薬（要指導医薬品）の販売が可能な薬局等の一覧」を検索しやすくした非公式ツール。GitHub Pages で静的ホスティング。
 
 - **公開URL**: https://odakin.github.io/mhlw-ec-pharmacy-finder/
-- **公式データ出典**: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+- **公式データ出典（薬局）**: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+- **公式データ出典（医療機関）**: https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000186912_00002.html
 
 ## リポジトリ構成
 
@@ -13,6 +14,7 @@
 docs/                    → GitHub Pages 公開ディレクトリ
   index.html / app.js / style.css  → フロントエンド（バニラJS）
   data.json              → 薬局データ（10,128件）
+  clinics.json           → 医療機関データ（3,107件、PDFパース）
   geocode_cache.json     → ジオコーディング結果（フロントエンド配信用コピー）
   FEATURE_SPEC.html / HOURS_PARSER.html → ドキュメントHTML（marked.jsで.mdをfetch+render）
   marked.min.js          → Markdownレンダリング（ローカルバンドル）
@@ -21,7 +23,8 @@ data/                    → 元データ・キャッシュ
   *.xlsx / *.csv / *.json → 厚労省データ加工済み
   geocode_cache.json     → ジオコーディング結果（マスター）
 scripts/
-  update_data.py         → 公式ページからデータ更新
+  update_data.py         → 公式ページからデータ更新（薬局、XLSX）
+  update_clinics.py      → 医療機関PDFパース → clinics.json 生成
   geocode.py             → 東大CSIS APIでジオコーディング（住所→緯度経度）
   hooks/pre-commit       → SESSION.md 更新漏れ防止フック
 line_bot/                → LINE Bot サンプル

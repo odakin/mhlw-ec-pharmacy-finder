@@ -19,3 +19,5 @@ __pycache__/
 # Data artifacts (we DO commit data/ here on purpose)
 # Keep temporary downloads out
 data/tmp/
+data/clinics/*.pdf
+data/clinics_*.json
