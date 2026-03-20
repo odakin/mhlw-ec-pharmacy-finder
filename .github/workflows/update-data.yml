@@ -39,11 +39,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
-      - name: Update data
+      - name: Update pharmacy data
         run: |
           python scripts/update_data.py
 
-      - name: Geocode new/changed pharmacies
+      - name: Update clinic data
+        run: |
+          python scripts/update_clinics.py
+        continue-on-error: true
+
+      - name: Geocode new/changed addresses
         run: |
           python scripts/geocode.py --limit 500
         continue-on-error: true

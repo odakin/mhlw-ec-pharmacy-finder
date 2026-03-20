@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>緊急避妊薬 販売可能な薬局検索</title>
-  <meta name="description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。都道府県・地名・薬局名で全国10,000件以上の薬局を検索できます。">
+  <meta name="description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局・医療機関の検索ツール。都道府県・地名で全国10,000件以上の薬局と3,000件以上の医療機関を検索できます。">
   <meta name="keywords" content="緊急避妊薬,アフターピル,薬局検索,OTC,要指導医薬品,厚生労働省">
   <meta name="theme-color" content="#0b57d0">
   <link rel="canonical" href="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
@@ -18,7 +18,7 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="緊急避妊薬 販売可能な薬局検索">
-  <meta property="og:description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。都道府県・地名・薬局名で全国10,000件以上の薬局を検索できます。">
+  <meta property="og:description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局・医療機関の検索ツール。都道府県・地名で全国10,000件以上の薬局と3,000件以上の医療機関を検索できます。">
   <meta property="og:url" content="https://odakin.github.io/mhlw-ec-pharmacy-finder/">
   <meta property="og:locale" content="ja_JP">
   <meta property="og:site_name" content="緊急避妊薬 薬局検索">
@@ -28,7 +28,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="緊急避妊薬 販売可能な薬局検索">
-  <meta name="twitter:description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。全国10,000件以上を検索。">
+  <meta name="twitter:description" content="厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局・医療機関の検索ツール。全国13,000件以上を検索。">
   <meta name="twitter:image" content="https://odakin.github.io/mhlw-ec-pharmacy-finder/og-image.png">
   <link rel="stylesheet" href="style.css">
   <!-- JSON-LD 構造化データ -->
@@ -37,7 +37,7 @@
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "緊急避妊薬 販売可能な薬局検索",
-    "description": "厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局の検索ツール。都道府県・地名・薬局名で全国10,000件以上の薬局を検索できます。",
+    "description": "厚生労働省の公式データに基づく緊急避妊薬（アフターピル）を購入できる薬局・医療機関の検索ツール。都道府県・地名で全国10,000件以上の薬局と3,000件以上の医療機関を検索できます。",
     "url": "https://odakin.github.io/mhlw-ec-pharmacy-finder/",
     "applicationCategory": "HealthApplication",
     "operatingSystem": "Any",
@@ -66,7 +66,7 @@
         "name": "緊急避妊薬（アフターピル）はどこで買えますか？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "厚生労働省が公表する全国10,000件以上の薬局で、処方箋なしで購入できます。このサイトでは都道府県・地名・薬局名から販売可能な薬局を検索できます。在庫や薬剤師の勤務状況は変動するため、来局前に電話確認が推奨されています。"
+          "text": "厚生労働省が公表する全国10,000件以上の薬局で、処方箋なしで購入できます。また、医療機関での対面診療による処方も可能です（3,000件以上）。このサイトでは都道府県・地名から薬局・医療機関を検索できます。在庫や薬剤師の勤務状況は変動するため、来局前に電話確認が推奨されています。"
         }
       },
       {
@@ -101,8 +101,8 @@
   {
     "@context": "https://schema.org",
     "@type": "Dataset",
-    "name": "緊急避妊薬の販売が可能な薬局等の一覧",
-    "description": "厚生労働省が公表する、要指導医薬品である緊急避妊薬（レボノルゲストレル）の販売が可能な薬局等の一覧データ。薬局名・住所・電話番号・営業時間・販売可能薬剤師の性別人数等を含む。",
+    "name": "緊急避妊薬の販売が可能な薬局等・医療機関の一覧",
+    "description": "厚生労働省が公表する、要指導医薬品である緊急避妊薬（レボノルゲストレル）の販売が可能な薬局等の一覧データおよび緊急避妊に係る対面診療が可能な医療機関の一覧データ。",
     "url": "https://odakin.github.io/mhlw-ec-pharmacy-finder/",
     "license": "https://www.mhlw.go.jp/chosakuken/index.html",
     "creator": {
@@ -230,10 +230,11 @@
       <noscript>
         <p>このツールはJavaScriptを使用しています。ブラウザのJavaScriptを有効にしてください。</p>
         <h2>緊急避妊薬（アフターピル）を買える薬局を探す</h2>
-        <p>緊急避妊薬（レボノルゲストレル）は、2024年11月から要指導医薬品として処方箋なしで薬局の店頭で購入できるようになりました。このサイトでは、厚生労働省が公表する全国10,000件以上の販売可能薬局を、都道府県・市区町村・薬局名で検索できます。</p>
+        <p>緊急避妊薬（レボノルゲストレル）は、2024年11月から要指導医薬品として処方箋なしで薬局の店頭で購入できるようになりました。このサイトでは、厚生労働省が公表する全国10,000件以上の販売可能薬局と3,000件以上の医療機関（対面診療）を、都道府県・市区町村・薬局名で検索できます。</p>
         <h3>主な機能</h3>
         <ul>
           <li>都道府県・地名・薬局名で全国の薬局を検索</li>
+          <li>医療機関（対面診療）も表示可能</li>
           <li>現在地から近い順にソート（地図表示対応）</li>
           <li>女性薬剤師がいる薬局で絞り込み</li>
           <li>営業時間・事前連絡の要否を確認</li>
@@ -261,7 +262,7 @@
     <h2>よくある質問</h2>
     <details>
       <summary>緊急避妊薬（アフターピル）はどこで買えますか？</summary>
-      <p>厚生労働省が公表する全国10,000件以上の薬局で、処方箋なしで購入できます。このサイトでは都道府県・地名・薬局名から販売可能な薬局を検索できます。在庫や薬剤師の勤務状況は変動するため、来局前に電話確認が推奨されています。</p>
+      <p>厚生労働省が公表する全国10,000件以上の薬局で、処方箋なしで購入できます。また、「🏥 医療機関も表示」をONにすると、対面診療で処方を受けられる3,000件以上の医療機関も検索できます。在庫や薬剤師の勤務状況は変動するため、来局前に電話確認が推奨されています。</p>
     </details>
     <details>
       <summary>緊急避妊薬の購入に処方箋は必要ですか？</summary>
@@ -359,7 +360,7 @@
       <a href="tel:#8891">#8891 性暴力相談</a>
     </div>
     <p class="small">
-      このツールは検索しやすさを目的にした非公式ツールであり、医療アドバイスを提供しません。購入可否・在庫・営業時間・条件等は各薬局でご確認ください。
+      このツールは検索しやすさを目的にした非公式ツールであり、医療アドバイスを提供しません。購入可否・在庫・営業時間・条件等は各薬局・医療機関でご確認ください。
     </p>
   </footer>
 

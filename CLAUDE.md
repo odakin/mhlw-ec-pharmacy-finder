@@ -25,7 +25,7 @@ data/                    → 元データ・キャッシュ
 scripts/
   update_data.py         → 公式ページからデータ更新（薬局、XLSX）
   update_clinics.py      → 医療機関PDFパース → clinics.json 生成
-  geocode.py             → 東大CSIS APIでジオコーディング（住所→緯度経度）
+  geocode.py             → 東大CSIS APIでジオコーディング（薬局+医療機関の住所→緯度経度）
   hooks/pre-commit       → SESSION.md 更新漏れ防止フック
 line_bot/                → LINE Bot サンプル
 AGENTS.md                → コードレビューガイドライン

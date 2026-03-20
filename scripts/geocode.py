@@ -1,7 +1,7 @@
 """
 scripts/geocode.py
 
-Geocode pharmacy addresses using the University of Tokyo CSIS
+Geocode pharmacy and clinic addresses using the University of Tokyo CSIS
 Simple Geocoding API (free, no API key required).
 
 Usage:
@@ -31,6 +31,7 @@ TIMEOUT = 15  # seconds per request
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_JSON = ROOT / "docs" / "data.json"
+CLINICS_JSON = ROOT / "docs" / "clinics.json"
 CACHE_FILE = ROOT / "data" / "geocode_cache.json"
 DOCS_CACHE = ROOT / "docs" / "geocode_cache.json"
 
@@ -138,17 +139,25 @@ def main():
     parser.add_argument("--force", action="store_true", help="Re-geocode everything")
     args = parser.parse_args()
 
-    # Load data
+    # Load pharmacy data
     with open(DATA_JSON, encoding="utf-8") as f:
         data = json.load(f)["data"]
     print(f"Loaded {len(data)} pharmacies from data.json")
 
+    # Load clinic data
+    clinics = []
+    if CLINICS_JSON.exists():
+        with open(CLINICS_JSON, encoding="utf-8") as f:
+            clinics = json.load(f).get("data", [])
+        print(f"Loaded {len(clinics)} clinics from clinics.json")
+
     cache = load_cache()
     print(f"Cache has {len(cache)} entries")
 
-    # Build work list
+    # Build work list (pharmacies + clinics)
+    all_records = data + clinics
     todo = []
-    for r in data:
+    for r in all_records:
         rid = str(r.get("id", ""))
         addr = (r.get("addr") or "").strip()
         if not rid or not addr:
