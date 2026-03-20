@@ -111,6 +111,17 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 .faq-section summary { padding: 10px 12px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
 .faq-section p { margin: 0; padding: 0 12px 10px; font-size: 0.85rem; color: #333; }
 
+/* Helpline section */
+.helpline-section { max-width: 980px; margin: 0 auto; padding: 16px; }
+.helpline-section h2 { font-size: 1.1rem; margin: 0 0 6px; }
+.helpline-lead { font-size: 0.85rem; color: #555; margin: 0 0 10px; }
+.helpline-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.helpline-card { display: flex; flex-direction: column; padding: 10px 14px; border: 1px solid #d0d7de; border-radius: 8px; background: #f8f9fa; text-decoration: none; color: inherit; min-width: 200px; flex: 1; }
+.helpline-card:hover { border-color: #0b57d0; background: #f0f4ff; }
+.helpline-number { font-size: 1.1rem; font-weight: 700; color: #0b57d0; }
+.helpline-name { font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
+.helpline-detail { font-size: 0.78rem; color: #666; margin-top: 2px; }
+
 /* Prefecture nav */
 .pref-nav { max-width: 980px; margin: 0 auto; padding: 16px; }
 .pref-nav h2 { font-size: 1.1rem; margin: 0 0 10px; }
