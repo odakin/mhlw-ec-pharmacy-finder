@@ -60,7 +60,7 @@ code { background: #eee; padding: 2px 6px; border-radius: 6px; }
 
 /* View toggle */
 .view-toggle { display: inline-flex; border: 1px solid #bbb; border-radius: 8px; overflow: hidden; }
-.view-toggle button { border: none; border-radius: 0; padding: 6px 14px; font-size: 0.85rem; background: #f4f4f4; color: #333; }
+.view-toggle button { border: none; border-radius: 0; padding: 10px 14px; font-size: 0.85rem; background: #f4f4f4; color: #333; }
 .view-toggle button.active { background: #111; color: white; }
 .view-toggle button:hover { opacity: 0.85; }
 
