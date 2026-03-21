@@ -129,15 +129,18 @@
 - CSS インライン化・JS minify は可能だが、メンテナンス性とのトレードオフで見送り
 - **現状のスコアで十分と判断**
 
-### Google Search Console（2026-03-20 確認）
+### Google Search Console（2026-03-22 更新）
 
-- **インデックス**: 登録済みページ 2
+- **インデックス**: 登録済みページ 2（+ ドキュメント6ページをURL検査からリクエスト済み）
 - **検索パフォーマンス**（3/12〜3/18、3か月表示）: 表示 158回、クリック 4回、CTR 2.5%、平均掲載順位 7.9
   - 上位クエリ: 「緊急避妊薬 取扱店検索」「ツルハドラッグ アフターピル」「緊急避妊薬販売薬局」等
 - **サイトマップ**: 送信済みだが「取得できませんでした」が継続（3/17送信、何度再送信しても同じ）
   - **原因**: Search Console のサイトマップ機能のバグ（GitHub Pages サブディレクトリサイトで頻発する既知問題）
   - **実害なし**: URL検査で sitemap.xml 自体は正常にインデックス登録済み。HTTP 200、Content-Type: application/xml、robots.txt にも Sitemap ディレクティブあり。Google は正常にクロールできている
   - **対応**: 放置。robots.txt からの自動検出に任せる
+- **URL検査からインデックス登録リクエスト済み**（2026-03-22）:
+  - `DESIGN.html` / `FEATURE_SPEC.html` / `HOURS_PARSER.html`（日本語）
+  - `DESIGN_EN.html` / `FEATURE_SPEC_EN.html` / `HOURS_PARSER_EN.html`（英語）
 - リッチリザルトテスト: 4件すべて有効（FAQ/Dataset/BreadcrumbList/WebApplication）
 - リンク: データ処理中（1日後に再確認とのメッセージ）
 
