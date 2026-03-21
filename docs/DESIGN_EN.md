@@ -75,7 +75,44 @@ Filters to pharmacies whose `privacy` field contains "private room" (個室).
 
 ---
 
-## 3. Pharmacy-Default with Medical Institution Toggle
+## 3. Empty Record Exclusion and Two-Layer Count Display
+
+The MHLW dataset contains records where address, phone number, and hours are all empty (177 as of March 2026). Their notes field typically reads "Consolidated into #XXX" — these are defunct or merged facilities. They are worthless to users (no way to call or locate them), so they are excluded from `data.json`.
+
+### Basis for Exclusion
+
+Evaluated against the 3-axis framework from Section 2:
+
+- **Source of information**: The MHLW data itself has addr / tel / hours all empty (primary source saying "no information")
+- **Alternative availability**: The consolidated-into facility exists as a separate record. Zero information loss
+- **Harm of not excluding**: Cards showing only a name and "Note: consolidated into #XXX" erode user trust
+
+→ This is not even a filter — it is a **data quality issue**. There is no reason to display these.
+
+### Count Display Design
+
+Exclusion reduces `data.json` to 9,951 records, but MHLW officially publishes 10,128. These two numbers have different meanings:
+
+| Number | Meaning | Displayed where |
+|---|---|---|
+| **10,128** | Facilities published by MHLW (data coverage) | Highlight card: "💊 10,128 nationwide" |
+| **9,951** | Actually searchable facilities (what users can interact with) | Status bar: "Loaded 9,951 pharmacy records" |
+
+The highlight card states "Complete official MHLW data." The number shown there should be the MHLW dataset size, not our filtered count. Hence it uses `meta.totalPublished`.
+
+The status bar is an operational report from the search engine — it accurately shows the number of records loaded as search targets.
+
+### Implementation
+
+- **`update_data.py`**: Skips addr-empty records. `meta.totalPublished = len(records) + skipped` preserves the MHLW-published count
+- **`app.js` (init)**: `!rr.addr` as a defensive filter (safety net against direct data.json edits)
+- **`app.js` (highlight)**: `META.totalPublished || DATA.length` — falls back gracefully for older data without totalPublished
+
+The title/meta text "全国10,000件以上" (over 10,000 nationwide) is an approximate expression referencing the MHLW dataset size and is unaffected by the exclusion.
+
+---
+
+## 4. Pharmacy-Default with Medical Institution Toggle
 
 By default, only pharmacies (薬局) are displayed. Turning on the "Also show medical institutions with stock" toggle lazy-loads `clinics.json` and integrates the results.
 
@@ -100,7 +137,7 @@ When pharmacies and medical institutions appear in mixed search results, users m
 
 ---
 
-## 4. Geolocation UX
+## 5. Geolocation UX
 
 Sorting by "nearest" requires the browser's geolocation, but we do not use the browser's standard `confirm()` dialog.
 
@@ -118,7 +155,7 @@ Geolocation is used solely for in-browser distance calculations and is never sen
 
 ---
 
-## 5. Hours Parser Philosophy
+## 6. Hours Parser Philosophy
 
 The MHLW data's `hours` field contains 6,933 distinct format variations. Rather than aiming for 100% parsing, we adopted a design of **97% accurate parsing + 3% graceful fallback**.
 
@@ -142,7 +179,7 @@ Reasons for not depending on external holiday APIs:
 
 ---
 
-## 6. Technology Selection Principles
+## 7. Technology Selection Principles
 
 The consistent principle is **free, no API key required, static hosting**.
 
