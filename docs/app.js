@@ -1193,7 +1193,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
 
 // ── Search ──
 
-const BASE_TITLE = "緊急避妊薬 販売可能な薬局検索";
+const BASE_TITLE = "緊急避妊薬（アフターピル）薬局検索 | 全国10,000件以上";
 
 function syncUrlFromState() {
   const params = new URLSearchParams();

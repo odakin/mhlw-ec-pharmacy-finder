@@ -1,4 +1,4 @@
-# 緊急避妊薬（要指導医薬品）販売可能な薬局検索
+# 緊急避妊薬（アフターピル）販売可能な薬局検索
 
 > **English version below** / [Jump to English](#english)
 
