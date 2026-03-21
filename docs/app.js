@@ -1202,6 +1202,7 @@ function syncUrlFromState() {
   if (pref) params.set("pref", pref);
   if (q) params.set("q", q);
   if (el("hasFemale").checked) params.set("female", "1");
+  if (el("hasPrivateRoom").checked) params.set("room", "1");
   if (el("onlyNotCallAhead").checked) params.set("nocall", "1");
   if (el("onlyAfterHours").checked) params.set("after", "1");
   if (el("showClinics").checked) params.set("clinic", "1");
@@ -1221,6 +1222,7 @@ function restoreStateFromUrl() {
   el("prefSelect").value = pref;
   el("q").value = q;
   el("hasFemale").checked = params.get("female") === "1";
+  el("hasPrivateRoom").checked = params.get("room") === "1";
   el("onlyNotCallAhead").checked = params.get("nocall") === "1";
   el("onlyAfterHours").checked = params.get("after") === "1";
   el("showClinics").checked = params.get("clinic") === "1";
@@ -1250,6 +1252,7 @@ function doSearch(resetLimit = true) {
   const onlyNotCallAhead = el("onlyNotCallAhead").checked;
   const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
+  const hasPrivateRoom = el("hasPrivateRoom").checked;
   const showClinics = el("showClinics").checked;
   const terms = q ? q.split(" ").filter(Boolean) : [];
   syncUrlFromState();
@@ -1260,6 +1263,7 @@ function doSearch(resetLimit = true) {
     if (onlyNotCallAhead && (r.callAhead || "") === "要") return false;
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
     if (hasFemale && !(toInt(r.pharmacistsFemale) > 0)) return false;
+    if (hasPrivateRoom && !(r.privacy || "").includes("個室")) return false;
     if (!terms.length) return true;
     return terms.every((t) => r._blob.includes(t));
   });
@@ -1412,6 +1416,7 @@ document.addEventListener("DOMContentLoaded", () => {
     el("onlyNotCallAhead").checked = false;
     el("onlyAfterHours").checked = false;
     el("hasFemale").checked = false;
+    el("hasPrivateRoom").checked = false;
     el("showClinics").checked = false;
     SORT_BY_DIST = false;
     USER_POS = null;
@@ -1424,6 +1429,7 @@ document.addEventListener("DOMContentLoaded", () => {
   el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
   el("hasFemale").addEventListener("change", () => doSearch(true));
+  el("hasPrivateRoom").addEventListener("change", () => doSearch(true));
   el("showClinics").addEventListener("change", async () => {
     if (el("showClinics").checked && !CLINICS_LOADED) {
       await loadClinics();

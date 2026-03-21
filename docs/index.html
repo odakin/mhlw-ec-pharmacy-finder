@@ -92,6 +92,14 @@
           "@type": "Answer",
           "text": "薬局によります。事前連絡が「要」の薬局と不要の薬局があります。このサイトの「事前連絡『要』を除く」フィルターで、予約なしで来局できる薬局を絞り込めます。"
         }
+      },
+      {
+        "@type": "Question",
+        "name": "個室のある薬局を探せますか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "はい。厚生労働省の公式データにはプライバシー配慮の情報（個室・衝立等）が含まれており、このサイトでは「個室あり」フィルターで個室対応の薬局に絞り込めます。"
+        }
       }
     ]
   }
@@ -201,6 +209,7 @@
           <label class="filter"><input type="checkbox" id="onlyNotCallAhead"><span>事前連絡「要」を除く</span></label>
           <label class="filter"><input type="checkbox" id="onlyAfterHours"><span>時間外対応あり</span></label>
           <label class="filter"><input type="checkbox" id="hasFemale"><span>女性薬剤師がいる</span></label>
+          <label class="filter"><input type="checkbox" id="hasPrivateRoom"><span>個室あり</span></label>
           <label class="filter filter-clinic"><input type="checkbox" id="showClinics"><span>常時在庫ありの医療機関も表示</span></label>
         </div>
       </div>
@@ -236,6 +245,7 @@
           <li>常時在庫ありの医療機関（対面診療）も表示可能</li>
           <li>現在地から近い順にソート（地図表示対応）</li>
           <li>女性薬剤師がいる薬局で絞り込み</li>
+          <li>個室のある薬局で絞り込み</li>
           <li>営業時間・事前連絡の要否を確認</li>
         </ul>
         <h3>相談窓口（すべて無料）</h3>
@@ -274,6 +284,10 @@
     <details>
       <summary>事前に電話予約は必要ですか？</summary>
       <p>薬局によります。事前連絡が「要」の薬局と不要の薬局があります。このサイトの「事前連絡『要』を除く」フィルターで、予約なしで来局できる薬局を絞り込めます。</p>
+    </details>
+    <details>
+      <summary>個室のある薬局を探せますか？</summary>
+      <p>はい。厚生労働省の公式データにはプライバシー配慮の情報（個室・衝立等）が含まれており、このサイトでは「個室あり」フィルターで個室対応の薬局に絞り込めます。</p>
     </details>
   </section>
 
