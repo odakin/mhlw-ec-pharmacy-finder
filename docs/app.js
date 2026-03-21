@@ -1228,7 +1228,7 @@ function showClinicBanner(pharmacyCount, clinicsAlreadyShown) {
   if (pharmacyCount <= 5 && !clinicsAlreadyShown && CLINICS_LOADED) {
     const banner = document.createElement("div");
     banner.className = "clinic-banner";
-    banner.innerHTML = `薬局が見つかりにくい場合、常時在庫ありの医療機関（対面診療）も検索できます。<button type="button" id="btnShowClinics">🏥 医療機関も表示</button>`;
+    banner.innerHTML = `薬局が見つかりにくい場合、常時在庫ありの医療機関（対面診療）も検索できます。<button type="button" id="btnShowClinics">🏥 常時在庫ありの医療機関も表示</button>`;
     const toolbar = document.querySelector(".results-toolbar");
     if (toolbar) toolbar.after(banner);
     banner.querySelector("#btnShowClinics").addEventListener("click", () => {
