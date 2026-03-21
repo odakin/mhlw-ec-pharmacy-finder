@@ -234,7 +234,7 @@
 - コンテキストバナー: 薬局≤5件時に「医療機関も検索できます」表示、ボタンクリックでトグルON
 - URL同期: `&clinic=1` パラメータ
 - クリアボタン: トグルもリセット
-- 地図: 🏥 絵文字マーカー（薬局はデフォルトマーカー）
+- 地図: 薬局=青ピン（Leafletデフォルト）、医療機関=赤ピン（同一PNG+CSSフィルター`hue-rotate(130deg) saturate(1.3)`）
 - ステータス表示: 「1,522 件ヒット（薬局 1,161 + 医療機関 361、50 件表示）」
 
 ### 残タスク
@@ -252,6 +252,9 @@
 - [x] 医療機関リスト追加 Phase 5: SEO更新（meta/FAQ/構造化データ/noscriptに医療機関を追加）
 - [x] 医療機関リスト追加 Phase 6: GitHub Actions に update_clinics.py + clinics.json バリデーション追加、requirements.txt に pdfplumber 追加
 - [x] レビュー修正: computeDistances()のCLINICS対応、geoバリデーション統一、Twitter Card統一、読み込み失敗フィードバック
+- [x] **モバイル横スクロール修正** — body overflow-x:hidden、flex子要素のビューポート超過を解消
+- [x] **フッター#8891重複削除** — 相談窓口セクションと重複していたリンクを除去
+- [x] **地図マーカー色分け改善** — 医療機関マーカーを🏥絵文字divIconからLeafletデフォルトPNG+CSSフィルター（`hue-rotate(130deg) saturate(1.3)`）方式に変更。薬局（青）と医療機関（赤）が完全同一形状・色だけ違い
 - [x] **祝日対応の実装**（営業時間パーサー拡張）— コミット c3a7f62, 85870b8, d3091c7
   - 3層構造で実装:
     - Layer B: `getJapaneseHolidays(year)` / `isJapaneseHoliday(date)` — 純粋計算（~60行、外部依存ゼロ、~2099年まで有効）。固定日・ハッピーマンデー・春分秋分（天文公式）・振替休日・国民の休日すべて対応

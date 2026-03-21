@@ -965,7 +965,20 @@ function updateMap(rows) {
 
     const markerOpts = {};
     if (r._isClinic) {
-      markerOpts.icon = L.divIcon({ className: "clinic-marker", html: "🏥", iconSize: [24, 24], iconAnchor: [12, 12] });
+      if (!updateMap._redIcon) {
+        const base = L.Icon.Default.imagePath;
+        updateMap._redIcon = L.icon({
+          iconUrl: base + 'marker-icon.png',
+          iconRetinaUrl: base + 'marker-icon-2x.png',
+          shadowUrl: base + 'marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          shadowSize: [41, 41],
+          popupAnchor: [1, -34],
+          className: 'marker-clinic',
+        });
+      }
+      markerOpts.icon = updateMap._redIcon;
     }
     const marker = L.marker([geo.lat, geo.lng], markerOpts).bindPopup(popup);
     MAP_MARKERS.addLayer(marker);
