@@ -78,6 +78,9 @@ async function loadClinics() {
       for (const k of ["pref","muni","name","addr","tel","url","hours","obgyn","stock","postal"]) {
         if (k in rr) rr[k] = cleanValue(rr[k]);
       }
+      // Only include clinics with 常時在庫あり (stock starts with "有" or "あり")
+      const st = (rr.stock || "").toString();
+      if (!st.startsWith("有") && st !== "あり") continue;
       rr._isClinic = true;
       rr._blob = buildSearchBlob(rr);
       recs.push(rr);
@@ -1093,15 +1096,13 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
 
     if (isClinic) {
       // Clinic card
-      const stock = (r.stock || "").toString();
-      const hasStock = stock.startsWith("有") || stock === "あり";
       li.innerHTML = `
         <div class="card clinic-card">
           <div class="cardHead">
             <div class="name">${title} ${distHtml}</div>
             <div class="badges">
               <span class="clinic-label">医療機関</span>
-              ${hasStock ? `<span class="badge">在庫あり</span>` : ``}
+              <span class="badge">常時在庫あり</span>
             </div>
           </div>
           <div class="place">${place}</div>
