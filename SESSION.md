@@ -266,6 +266,13 @@
   - sitemap.xml にドキュメント3ページ（DESIGN/FEATURE_SPEC/HOURS_PARSER）を追加
   - DESIGN.md の技術選定テーブルから FEATURE_SPEC.md と重複する不採用理由を削除し参照リンクに変更
   - getJapaneseHolidays() の行数を「約60行」→「約70行」に修正（実際68行）
+- 英語版ドキュメント3ページ追加:
+  - `docs/DESIGN_EN.md` + `docs/DESIGN_EN.html`
+  - `docs/FEATURE_SPEC_EN.md` + `docs/FEATURE_SPEC_EN.html`
+  - `docs/HOURS_PARSER_EN.md` + `docs/HOURS_PARSER_EN.html`
+- README英語セクションのリンクを_EN版に変更
+- sitemap.xml に英語3ページ追加（計6ドキュメントページ）
+- 日本語HTML 3ファイルに🇺🇸 English リンク追加、英語HTML 3ファイルに🇯🇵 日本語リンク追加
 
 ### 残タスク
 

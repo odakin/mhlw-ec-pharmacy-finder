@@ -192,9 +192,9 @@ A search tool for pharmacies and medical institutions in Japan that provide emer
 
 Design documents recording the reasoning behind implementation decisions:
 
-- **[Design Philosophy](https://odakin.github.io/mhlw-ec-pharmacy-finder/DESIGN.html)** — Why the site is built the way it is: filter design principles (3-axis evaluation), pharmacy/clinic display strategy, location privacy UX, hours parser philosophy, and technology choices
-- **[Feature Specification](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC.html)** — Requirements and technical choices for all 4 features
-- **[Business Hours Parser Design](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER.html)** — How the multi-stage normalization pipeline parses 6,933 format variations at 97.1% coverage
+- **[Design Philosophy](https://odakin.github.io/mhlw-ec-pharmacy-finder/DESIGN_EN.html)** — Why the site is built the way it is: filter design principles (3-axis evaluation), pharmacy/clinic display strategy, location privacy UX, hours parser philosophy, and technology choices
+- **[Feature Specification](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC_EN.html)** — Requirements and technical choices for all 4 features
+- **[Business Hours Parser Design](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER_EN.html)** — How the multi-stage normalization pipeline parses 6,933 format variations at 97.1% coverage
 
 ## License
 - Code: MIT License
