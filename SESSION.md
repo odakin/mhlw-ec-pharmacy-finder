@@ -49,7 +49,7 @@
 
 ### SEO 追加施策（コミット 17b4640）
 
-- FAQ構造化データ（FAQPage JSON-LD、4問）
+- FAQ構造化データ（FAQPage JSON-LD、6問）
 - Dataset構造化データ（厚労省データセット情報）
 - OG画像（og-image.png、1200x630）
 - twitter:card を summary_large_image に変更
@@ -92,7 +92,7 @@
 
 ### SEO 第3弾（コミット 220acfe）
 
-- 可視FAQセクション（`<details>`/`<summary>` 4問）
+- 可視FAQセクション（`<details>`/`<summary>` 6問）
 - 都道府県内部リンク（47都道府県の `?pref=X` リンク）
 - `<script defer>` に変更
 - `<link rel="preload" href="data.json">` 追加（コミット bee31ef）
@@ -326,7 +326,7 @@
 - Google Search Console 登録
 - JSON-LD 構造化データ（WebApplication）
 - noscript フォールバック
-- FAQ構造化データ（FAQPage、4問）— リッチスニペット狙い
+- FAQ構造化データ（FAQPage、6問）— リッチスニペット狙い
 - Dataset構造化データ
 - OG画像（1200x630 PNG）
 - favicon（💊）/ theme-color / preconnect
