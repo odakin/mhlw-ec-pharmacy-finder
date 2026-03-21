@@ -3,17 +3,20 @@
 > **English version below** / [Jump to English](#english)
 
 
-このリポジトリは、厚生労働省が公表している緊急避妊薬（要指導医薬品）の販売が可能な薬局の一覧を、
+このリポジトリは、厚生労働省が公表している緊急避妊薬の**薬局一覧**（要指導医薬品販売）と**医療機関一覧**（対面診療・処方）を、
 検索しやすい **CSV / XLSX / JSON** に整形し、さらに **静的Web検索（GitHub Pages）** と **LINE Botサンプル** を添えたものです。
 
-- 出典（公式ページ）: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
-- 最新取り込みデータ時点: 2026-03-10
+- 出典（公式ページ）:
+  - 薬局: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+  - 医療機関: https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000186912_00002.html
+- 最新取り込みデータ時点: 薬局 2026-03-10 / 医療機関 2026-02-20
 - 生成物:
   - `data/` : 整形済みデータ（CSV/XLSX/JSON、原本XLSX、ジオコーディングキャッシュ）
   - `docs/` : 静的Web検索（GitHub Pages用、地図・営業時間表示対応）
   - `line_bot/` : LINE Bot（Node.js最小サンプル）
-  - `scripts/update_data.py` : 公式ページから最新データを取り込み直す更新スクリプト
-  - `scripts/geocode.py` : 住所→緯度経度変換（東大CSIS API）
+  - `scripts/update_data.py` : 薬局データ更新スクリプト（公式XLSX取得）
+  - `scripts/update_clinics.py` : 医療機関データ更新スクリプト（公式PDF 47件パース）
+  - `scripts/geocode.py` : 住所→緯度経度変換（東大CSIS API、薬局+医療機関対応）
 
 ---
 
@@ -65,10 +68,11 @@ Web UI の絞り込み:
 - 女性薬剤師がいる
 
 Web UI の機能:
-- **地図表示**: Leaflet.js + OpenStreetMap で検索結果をピン表示（マーカークラスタリング対応）
-- **近い順ソート**: ブラウザの位置情報から現在地を取得し、距離順にソート
+- **地図表示**: Leaflet.js + OpenStreetMap で検索結果をピン表示（マーカークラスタリング対応、薬局=青・医療機関=赤）
+- **近い順ソート**: ブラウザの位置情報から現在地を取得し、距離順にソート（薬局・医療機関を統合ソート）
 - **営業時間表示**: 今日の営業状況（営業中/営業時間外/休み）をハイライト + 全曜日スケジュール折りたたみ表示。祝日の自動判定対応（祝日休み・祝日営業時間）
-- **Google Mapリンク**: 各薬局カードから Google Map へ直接遷移（写真・口コミ・ナビ）
+- **医療機関検索**: 常時在庫ありの医療機関をトグルで追加表示（デフォルトは薬局のみ）
+- **Google Mapリンク**: 各薬局・医療機関カードから Google Map へ直接遷移（写真・口コミ・ナビ）
 
 ---
 
@@ -95,7 +99,12 @@ npm start
 
 ```bash
 pip install -r scripts/requirements.txt
+
+# 薬局データ更新
 python scripts/update_data.py
+
+# 医療機関データ更新（47都道府県PDFパース）
+python scripts/update_clinics.py
 
 # 参考：ローカルに保存した XLSX から再生成する場合
 # python scripts/update_data.py --xlsx path/to/source.xlsx --as-of YYYY-MM-DD
@@ -103,7 +112,8 @@ python scripts/update_data.py
 
 更新が入ると、次が作られます:
 - `data/` に日付付きの CSV/XLSX/JSON
-- `docs/data.json` と `line_bot/data.json` が最新に差し替え
+- `docs/data.json` と `line_bot/data.json` が最新に差し替え（薬局）
+- `docs/clinics.json` が最新に差し替え（医療機関）
 
 ### ジオコーディング（地図機能用）
 
@@ -143,26 +153,29 @@ python3 scripts/geocode.py --force      # 全件再取得
 
 # Emergency Contraceptive Pill — Pharmacy Finder (Japan)
 
-A search tool for pharmacies in Japan that sell emergency contraceptive pills (afterpills / morning-after pills), based on official data published by the Ministry of Health, Labour and Welfare (MHLW).
+A search tool for pharmacies and medical institutions in Japan that provide emergency contraceptive pills (afterpills / morning-after pills), based on official data published by the Ministry of Health, Labour and Welfare (MHLW).
 
 - **Live site**: https://odakin.github.io/mhlw-ec-pharmacy-finder/
-- **Official data source**: https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+- **Official data sources**:
+  - Pharmacies (OTC): https://www.mhlw.go.jp/stf/kinnkyuuhininnyaku_00005.html
+  - Medical institutions (prescription): https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000186912_00002.html
 
 ## Features
 
-- **10,000+ pharmacies** across all 47 prefectures
-- **Map view** with marker clustering (Leaflet.js + OpenStreetMap)
-- **Sort by nearest** using browser geolocation
+- **10,000+ pharmacies + 2,900+ medical institutions** across all 47 prefectures
+- **Map view** with marker clustering (Leaflet.js + OpenStreetMap; pharmacies in blue, clinics in red)
+- **Sort by nearest** using browser geolocation (unified sort across pharmacies and clinics)
 - **Business hours** display with today's status highlighted (including national holiday detection)
 - **Filters**: female pharmacist available, after-hours support, no appointment needed
-- **Google Maps link** for each pharmacy (directions, reviews, photos)
+- **Medical institution toggle**: optionally include clinics with confirmed stock (off by default)
+- **Google Maps link** for each pharmacy/clinic (directions, reviews, photos)
 - **Daily auto-update** via GitHub Actions
 
 ## Important Notice
 
 - This tool does not provide medical advice.
-- Always confirm availability, hours, and conditions directly with the pharmacy before visiting.
-- The MHLW official page is the authoritative source.
+- Always confirm availability, hours, and conditions directly with the pharmacy or clinic before visiting.
+- The MHLW official pages are the authoritative source.
 
 ## Components
 
@@ -170,7 +183,7 @@ A search tool for pharmacies in Japan that sell emergency contraceptive pills (a
 |-----------|-------------|
 | `docs/` | Static website (GitHub Pages) |
 | `data/` | Cleaned CSV / XLSX / JSON data |
-| `scripts/` | Data update & geocoding scripts |
+| `scripts/` | Data update (pharmacies + clinics) & geocoding scripts |
 | `line_bot/` | LINE Bot sample (Node.js) |
 
 ## Technical Documentation

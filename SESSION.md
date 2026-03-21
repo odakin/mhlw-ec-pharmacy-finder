@@ -183,7 +183,7 @@
 - 形式: **PDF（都道府県別47ファイル）** — Excel/CSV なし
 - カラム: 施設名、郵便番号、住所、電話番号、URL、産科/婦人科標榜の有無、対応可能時間帯、常時在庫の有無
 - 更新日: 令和8年2月20日
-- 件数: 各県数十施設、全国で推定1,000〜2,000件
+- 件数: 3,107件（当初推定1,000〜2,000件）
 
 **デザイン決定: フィルターチップ・トグル方式**（2026-03-20 検討・決定）
 
@@ -240,11 +240,6 @@
 ### 残タスク
 
 - [ ] 全機能のライブサイトテスト（近い順は位置情報が必要）
-- [x] **モバイル横スクロール修正** — スワイプ時に左右に動く問題を修正
-  - body に `overflow-x: hidden` 追加
-  - `.results-actions` の `flex-shrink: 0` → `flex-wrap: wrap; max-width: 100%`
-  - `.nearby-notice` の `white-space: nowrap` を除去
-  - モバイル `.results-toolbar` の `align-items: flex-start` を除去（子要素がビューポート幅を超過する原因）
 - [x] Search Console 確認（2026-03-20）— サイトマップは SC バグで放置、検索パフォーマンスは表示158回/クリック4回で順調に蓄積中
 - [x] 医療機関リスト追加 Phase 1-2: PDFパース → clinics.json 生成完了（3,107件）
 - [x] 医療機関リスト追加 Phase 3: フロントエンド統合完了
@@ -252,7 +247,7 @@
 - [x] 医療機関リスト追加 Phase 5: SEO更新（meta/FAQ/構造化データ/noscriptに医療機関を追加）
 - [x] 医療機関リスト追加 Phase 6: GitHub Actions に update_clinics.py + clinics.json バリデーション追加、requirements.txt に pdfplumber 追加
 - [x] レビュー修正: computeDistances()のCLINICS対応、geoバリデーション統一、Twitter Card統一、読み込み失敗フィードバック
-- [x] **モバイル横スクロール修正** — body overflow-x:hidden、flex子要素のビューポート超過を解消
+- [x] **モバイル横スクロール修正** — body overflow-x:hidden、flex子要素のビューポート超過を解消（詳細: overflow-x:hidden、flex-wrap:wrap、nowrap除去、align-items除去）
 - [x] **フッター#8891重複削除** — 相談窓口セクションと重複していたリンクを除去
 - [x] **地図マーカー色分け改善** — 医療機関マーカーを🏥絵文字divIconからLeafletデフォルトPNG+CSSフィルター（`hue-rotate(130deg) saturate(1.3)`）方式に変更。薬局（青）と医療機関（赤）が完全同一形状・色だけ違い
 - [x] **リスト/地図ボタンのタップターゲット拡大** — padding 6px→10px、高さ32.5px→40.5px（モバイルUX改善）
