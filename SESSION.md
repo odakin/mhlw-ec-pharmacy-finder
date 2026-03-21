@@ -261,6 +261,11 @@
 - 内容: サイトのスコープ判断、フィルター設計原則（3軸評価）、薬局/医療機関トグル方式の理由、位置情報UX、営業時間パーサーの哲学、技術選定の原則
 - README.md の技術ドキュメントセクション（日英両方）に設計思想へのリンクを追加
 - FEATURE_SPEC.html / HOURS_PARSER.html のナビバーに設計思想リンクを追加
+- 整合性チェックで発見した修正:
+  - FEATURE_SPEC.md の `HOURS_PARSER.md` 参照を `.html` リンクに修正（GitHub Pages でのリンク切れ防止）
+  - sitemap.xml にドキュメント3ページ（DESIGN/FEATURE_SPEC/HOURS_PARSER）を追加
+  - DESIGN.md の技術選定テーブルから FEATURE_SPEC.md と重複する不採用理由を削除し参照リンクに変更
+  - getJapaneseHolidays() の行数を「約60行」→「約70行」に修正（実際68行）
 
 ### 残タスク
 
