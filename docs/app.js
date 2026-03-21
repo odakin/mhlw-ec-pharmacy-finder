@@ -1375,6 +1375,8 @@ async function init() {
         if (rr.pref) PENDING_PREFS.add(rr.pref);
         continue;
       }
+      // Skip records with no address (consolidated/defunct — no usable info)
+      if (!rr.addr) continue;
       rr._blob = buildSearchBlob(rr);
       real.push(rr);
     }
@@ -1382,7 +1384,7 @@ async function init() {
 
     el("asOf").textContent = META.asOf || "-";
     const hiCount = el("hiCount");
-    if (hiCount) hiCount.textContent = DATA.length.toLocaleString() + " 件";
+    if (hiCount) hiCount.textContent = (META.totalPublished || DATA.length).toLocaleString() + " 件";
     const a = el("sourceLink");
     a.href = META.sourcePage || "#";
     a.textContent = "薬局一覧";

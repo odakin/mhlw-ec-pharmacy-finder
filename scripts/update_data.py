@@ -591,11 +591,18 @@ def main(argv: list[str] | None = None) -> int:
             app_df[c] = app_df[c].replace({np.nan: "", pd.NA: ""}).fillna("").apply(clean_text)
 
     records = []
+    skipped = 0
     for rec in app_df.to_dict(orient="records"):
         rid = rec.get("id")
         rec["id"] = int(rid) if rid is not None and rid is not pd.NA else None
+        # Skip records with no address — these are consolidated/defunct entries
+        # with no usable information (no tel, no hours, no addr).
+        if not rec.get("addr"):
+            skipped += 1
+            continue
         records.append(rec)
 
+    total_published = len(records) + skipped
     payload = {
         "meta": {
             "asOf": as_of,
@@ -603,6 +610,7 @@ def main(argv: list[str] | None = None) -> int:
             "sourceXlsx": xlsx_url,
             "generatedAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "records": len(records),
+            "totalPublished": total_published,
         },
         "data": records,
     }
@@ -622,6 +630,8 @@ def main(argv: list[str] | None = None) -> int:
     print("Updated to:", as_of)
     print("XLSX:", xlsx_url)
     print("Records:", len(records))
+    if skipped:
+        print(f"Skipped {skipped} records with no address (consolidated/defunct)")
     return 0
 
 
