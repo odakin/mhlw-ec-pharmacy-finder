@@ -66,6 +66,7 @@ Web UI の絞り込み:
 - 事前連絡「要」を除く
 - 時間外対応あり
 - 女性薬剤師がいる
+- 個室あり
 
 Web UI の機能:
 - **地図表示**: Leaflet.js + OpenStreetMap で検索結果をピン表示（マーカークラスタリング対応、薬局=青・医療機関=赤）
@@ -166,7 +167,7 @@ A search tool for pharmacies and medical institutions in Japan that provide emer
 - **Map view** with marker clustering (Leaflet.js + OpenStreetMap; pharmacies in blue, clinics in red)
 - **Sort by nearest** using browser geolocation (unified sort across pharmacies and clinics)
 - **Business hours** display with today's status highlighted (including national holiday detection)
-- **Filters**: female pharmacist available, after-hours support, no appointment needed
+- **Filters**: female pharmacist available, after-hours support, no appointment needed, private room available
 - **Medical institution toggle**: optionally include clinics with confirmed stock (off by default)
 - **Google Maps link** for each pharmacy/clinic (directions, reviews, photos)
 - **Daily auto-update** via GitHub Actions
