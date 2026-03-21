@@ -87,6 +87,12 @@ async function loadClinics() {
     }
     CLINICS = recs;
     CLINICS_LOADED = true;
+    if (json.meta && json.meta.asOf) {
+      const asOfC = el("asOfClinics");
+      if (asOfC) asOfC.textContent = json.meta.asOf;
+      const wrap = el("clinicsAsOfWrap");
+      if (wrap) wrap.style.display = "";
+    }
     // Compute distances if user pos is known
     if (USER_POS) {
       for (const r of CLINICS) {
@@ -1375,7 +1381,7 @@ async function init() {
     if (hiCount) hiCount.textContent = DATA.length.toLocaleString() + " 件";
     const a = el("sourceLink");
     a.href = META.sourcePage || "#";
-    a.textContent = "厚生労働省（公式）";
+    a.textContent = "薬局一覧";
 
     fillPrefOptions();
     restoreStateFromUrl();
