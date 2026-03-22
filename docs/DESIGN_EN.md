@@ -26,7 +26,7 @@ This site has two types of filters, each with different criteria for implementat
 
 ### Default Exclusion (Options Hidden from the User)
 
-Emergency contraception is time-critical. The decision to hide options by default is made carefully, evaluated along **three axes**:
+Emergency contraception is time-critical. The decision to hide options by default requires careful, **deep** consideration along each axis. Evaluated along **three axes**:
 
 | Axis | Question |
 |---|---|
