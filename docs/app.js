@@ -318,9 +318,17 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日祝])[;；]/g, "$1:");
   // Normalize ｡ to , (segment separator)
   s = s.replace(/｡/g, ",");
-  // "X曜を除く" / "祝を除く" — strip day-exclusion markers
+  // Strip parenthesized exclusion notes: （除く水曜）, (木は除く), (水曜以外) etc.
+  // These corrupt the day:time structure if left in place. Stripping loses the
+  // exclusion detail but preserves the base schedule (Missing info > Wrong info).
+  s = s.replace(/[（(][^)）]*(?:除く|以外)[^)）]*[）)]/g, "");
+  // "Xを除くY" — strip the "Xを除く" prefix, preserving the following day spec Y.
+  // e.g. "水を除く月-金:9:00" → "月-金:9:00" (水 exclusion lost, but base schedule preserved)
+  // Only strip when followed by a day char (to avoid stripping standalone "祝を除く" notes)
+  s = s.replace(/[月火水木金土日祝]+を?除く(?=[月火水木金土日祝毎])/g, "");
+  // Standalone "祝を除く" / "祝除く" at segment boundaries
   // (holidayClosed detection happens in parseHours on raw text before normalization)
-  s = s.replace(/[月火水木金土日祝]+を?除く/g, "");
+  s = s.replace(/祝を?除く/g, "");
   // Normalize 漢数字 in ordinal day specs (第一土 -> 第1土, 第二 -> 第2, etc.)
   // Also handle comma-preceded: ,四日 -> ,4日
   s = s.replace(/([第・,])([一二三四五])/g, (_, p, k) => p + ("一二三四五".indexOf(k) + 1));
