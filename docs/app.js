@@ -422,7 +422,8 @@ function parseDaySpec(spec) {
 function parseTimeRange(tr) {
   // "9:00-18:00" -> {open: "9:00", close: "18:00"}
   // Also accept ~ as separator (in case normalization missed a tilde variant)
-  const m = tr.match(/^(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})$/);
+  // No $ anchor: trailing text (notes, parenthesized comments) is silently ignored
+  const m = tr.match(/^(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
   if (!m) return null;
   // Validate: hours 0-29 (Japan late-night convention: 25:00=1AM), minutes 0-59
   const [oh, om] = m[1].split(":").map(Number);
