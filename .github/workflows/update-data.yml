@@ -96,9 +96,16 @@ jobs:
           for (const k of ['id','pref','name','addr']) {
             if (!(k in r)) throw new Error(`missing key in records: ${k}`);
           }
-          if (!r.id.startsWith('c')) throw new Error('clinic IDs must start with "c"');
+          if (!r.id.startsWith('c-')) throw new Error('clinic IDs must use stable format (c-XXXXXXXX)');
+          // Minimum record count — fewer than 2000 always indicates partial failure
+          if (j.data.length < 2000) {
+            throw new Error(`clinics.json has only ${j.data.length} records (expected 2000+)`);
+          }
           console.log(`clinics.json OK: ${j.data.length} records`);
           NODE
+
+      - name: Build static doc HTML from Markdown
+        run: python scripts/build_docs.py
 
       - name: Update sitemap.xml lastmod
         run: |

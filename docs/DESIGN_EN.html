@@ -44,7 +44,328 @@ ul, ol { padding-left: 2em; }
   <a href="https://github.com/odakin/mhlw-ec-pharmacy-finder">📦 GitHub</a>
   <a href="DESIGN.html">🇯🇵 日本語</a>
 </div>
-<div id="content">Loading...</div>
+<div id="content">
+<h1 id="design-philosophy">Design Philosophy</h1>
+<p>This document records the design decisions and their rationale behind the Emergency Contraception Pharmacy Finder. It is intended for developers who want to understand "why things are the way they are," and as a reference for those building similar projects.</p>
+<p>For technical specifications, see the <a href="FEATURE_SPEC_EN.html">Feature Spec</a> and the <a href="HOURS_PARSER_EN.html">Hours Parser Design</a>.</p>
+<hr>
+<h2 id="1-this-site-is-a-search-tool-not-a-medical-information-site">1. This Site Is a "Search Tool," Not a "Medical Information Site"</h2>
+<p>This is the most fundamental design decision. The site does not cover medical information such as the efficacy, side effects, or administration methods of emergency contraception.</p>
+<p><strong>Reasons</strong>:</p>
+<ul>
+<li>Ensuring the ongoing accuracy of medical information is the responsibility of specialized institutions, not something a personal project should take on</li>
+<li>Users of this site want to "find a pharmacy right now" — they are not in a phase of reading medical information</li>
+<li>By narrowing the scope, we can focus on search quality</li>
+</ul>
+<p>For this reason, medical information and lengthy explanatory text are intentionally omitted from the header and filter areas. We should not add noise to the navigation path of users in a hurry. Questions like "What is the difference between pharmacies and medical institutions?" are addressed with a single FAQ entry, as they relate to usage decisions.</p>
+<hr>
+<h2 id="2-filter-design-principles">2. Filter Design Principles</h2>
+<p>This site has two types of filters, each with different criteria for implementation.</p>
+<h3 id="default-exclusion-options-hidden-from-the-user">Default Exclusion (Options Hidden from the User)</h3>
+<p>Emergency contraception is time-critical. The decision to hide options by default requires careful, <strong>deep</strong> consideration along each axis. Evaluated along <strong>three axes</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Source of information</strong></td>
+<td>Is it self-reported by the facility (primary source), or parsed/estimated by us (secondary processing)?</td>
+</tr>
+<tr>
+<td><strong>Availability of alternatives</strong></td>
+<td>Can the purpose of the excluded option be achieved through another route?</td>
+</tr>
+<tr>
+<td><strong>Harm of not excluding</strong></td>
+<td>Is it a risk of wasted trips (noise), or a loss of useful options?</td>
+</tr>
+</tbody>
+</table>
+<h4 id="example-stock-availability-filter-for-medical-institutions-exclusion-ok">Example: Stock availability filter for medical institutions (医療機関) → Exclusion OK</h4>
+<p>The medical institution data includes a "stock availability" (常時在庫の有無) column from the MHLW PDF. Facilities marked "No" or "Unknown" are hidden by default.</p>
+<ul>
+<li><strong>Source</strong>: The facility itself reported "not regularly stocked" to MHLW (primary source)</li>
+<li><strong>Alternatives</strong>: Facilities without stock require an in-person consultation followed by an external prescription — the patient then goes to a pharmacy (薬局). Over 10,000 pharmacies are already listed, so there is no information loss</li>
+<li><strong>Harm of not excluding</strong>: Risk of wasted trips to facilities that have reported they do not regularly stock the medication</li>
+</ul>
+<blockquote>
+<p>Primary source + alternatives available + practical benefit of noise removal. Exclusion is justified.</p>
+</blockquote>
+<h4 id="example-currently-open-filter-not-implemented">Example: "Currently Open" filter → Not implemented</h4>
+<p>This seems useful at first glance, but is intentionally not implemented.</p>
+<ul>
+<li><strong>Source</strong>: Estimated by the hours parser (secondary processing). Coverage is 97.1%, meaning approximately 290 facilities cannot have their operating status determined</li>
+<li><strong>Alternatives</strong>: The nearest pharmacy might be one of those unparseable entries — no alternative exists</li>
+<li><strong>Harm of not excluding</strong>: None. The current design of displaying business hours on each card is sufficient</li>
+</ul>
+<blockquote>
+<p>Secondary processing creates a risk of inadvertently hiding useful options as collateral damage, and there is no harm in not excluding. The conditions differ from the stock filter on all three axes.</p>
+</blockquote>
+<h3 id="user-initiated-filters-user-turns-them-on">User-Initiated Filters (User Turns Them ON)</h3>
+<p>Because everything is visible when the filter is OFF, the criteria are more relaxed than for default exclusion:</p>
+<ol>
+<li><strong>Data must be from a primary source</strong> — based on the facility's self-reporting</li>
+<li><strong>The filter rate must be meaningful</strong> — a filter with too high a pass rate does not function</li>
+</ol>
+<h4 id="example-private-room-available-implemented">Example: Private Room Available (個室あり) → Implemented</h4>
+<p>Filters to pharmacies whose <code>privacy</code> field contains "private room" (個室).</p>
+<ul>
+<li><strong>Data</strong>: Self-reported by the facility (primary source)</li>
+<li><strong>Filter rate</strong>: 1,443 out of 10,128 pharmacies (14%). A meaningfully selective filter</li>
+</ul>
+<h4 id="example-partition-available-not-implemented">Example: Partition Available (衝立あり) → Not implemented</h4>
+<ul>
+<li>79% of all pharmacies qualify. A filter that 9 out of 10 entries pass does not function</li>
+<li>Too many filters in an emergency situation can cause decision paralysis</li>
+</ul>
+<hr>
+<h2 id="3-empty-record-exclusion-and-two-layer-count-display">3. Empty Record Exclusion and Two-Layer Count Display</h2>
+<p>The MHLW dataset contains records where address, phone number, and hours are all empty (177 as of March 2026). Their notes field typically reads "Consolidated into #XXX" — these are defunct or merged facilities. They are worthless to users (no way to call or locate them), so they are excluded from <code>data.json</code>.</p>
+<h3 id="basis-for-exclusion">Basis for Exclusion</h3>
+<p>Evaluated against the 3-axis framework from Section 2:</p>
+<ul>
+<li><strong>Source of information</strong>: The MHLW data itself has addr / tel / hours all empty (primary source saying "no information")</li>
+<li><strong>Alternative availability</strong>: The consolidated-into facility exists as a separate record. Zero information loss</li>
+<li><strong>Harm of not excluding</strong>: Cards showing only a name and "Note: consolidated into #XXX" erode user trust</li>
+</ul>
+<p>→ This is not even a filter — it is a <strong>data quality issue</strong>. There is no reason to display these.</p>
+<h3 id="count-display-design">Count Display Design</h3>
+<p>Exclusion reduces <code>data.json</code> to 9,951 records, but MHLW officially publishes 10,128. These two numbers have different meanings:</p>
+<table>
+<thead>
+<tr>
+<th>Number</th>
+<th>Meaning</th>
+<th>Displayed where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>10,128</strong></td>
+<td>Facilities published by MHLW (data coverage)</td>
+<td>Highlight card: "💊 10,128 nationwide"</td>
+</tr>
+<tr>
+<td><strong>9,951</strong></td>
+<td>Actually searchable facilities (what users can interact with)</td>
+<td>Status bar: "Loaded 9,951 pharmacy records"</td>
+</tr>
+</tbody>
+</table>
+<p>The highlight card states "Complete official MHLW data." The number shown there should be the MHLW dataset size, not our filtered count. Hence it uses <code>meta.totalPublished</code>.</p>
+<p>The status bar is an operational report from the search engine — it accurately shows the number of records loaded as search targets.</p>
+<h3 id="implementation">Implementation</h3>
+<ul>
+<li><strong><code>update_data.py</code></strong>: Skips addr-empty records. <code>meta.totalPublished = len(records) + skipped</code> preserves the MHLW-published count. <code>meta.scriptHash</code> ensures automatic cache invalidation (see §8)</li>
+<li><strong><code>app.js</code> (init)</strong>: <code>!rr.addr</code> as a defensive filter (safety net against direct data.json edits)</li>
+<li><strong><code>app.js</code> (highlight)</strong>: <code>META.totalPublished || DATA.length</code> — falls back gracefully for older data without totalPublished</li>
+</ul>
+<p>The title/meta text "全国10,000件以上" (over 10,000 nationwide) is an approximate expression referencing the MHLW dataset size and is unaffected by the exclusion.</p>
+<hr>
+<h2 id="4-pharmacy-default-with-medical-institution-toggle">4. Pharmacy-Default with Medical Institution Toggle</h2>
+<p>By default, only pharmacies (薬局) are displayed. Turning on the "Also show medical institutions with stock" toggle lazy-loads <code>clinics.json</code> and integrates the results.</p>
+<h3 id="rejected-alternatives">Rejected Alternatives</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Reason for Rejection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tab separation</strong> (Pharmacy tab / Medical Institution tab)</td>
+<td>Cannot cross-sort pharmacies and medical institutions by "nearest." Users may not notice if the nearest option is a medical institution</td>
+</tr>
+<tr>
+<td><strong>Full integration</strong> (always show both)</td>
+<td>Filters become complex. Fields unique to pharmacies (female pharmacist, private room, etc.) and fields unique to medical institutions (OB/GYN department, stock status) would be mixed together</td>
+</tr>
+<tr>
+<td><strong>Separate page</strong></td>
+<td>An extra navigation step during an emergency. Everything should be on one page</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-pharmacies-are-the-default">Why Pharmacies Are the Default</h3>
+<ul>
+<li>Pharmacies allow purchase without a prescription (OTC since February 2026). Medical institutions require an in-person consultation + prescription, adding one extra step</li>
+<li>Zero impact on existing SEO, bookmarks, and external links (existing user experience unchanged)</li>
+<li>Users who do not need <code>clinics.json</code> (972KB) are not forced to download it (performance)</li>
+<li>In areas with few pharmacies, a "You can also search medical institutions" banner appears automatically, so guidance is functional</li>
+</ul>
+<h3 id="visual-distinction-of-cards">Visual Distinction of Cards</h3>
+<p>When pharmacies and medical institutions appear in mixed search results, users must be able to distinguish them at a glance. Medical institution cards feature a red left border + a "Medical Institution" (医療機関) label + a note: "An in-person consultation and prescription are required." On the map, pharmacies use blue pins and medical institutions use red pins.</p>
+<hr>
+<h2 id="5-geolocation-ux">5. Geolocation UX</h2>
+<p>Sorting by "nearest" requires the browser's geolocation, but we do not use the browser's standard <code>confirm()</code> dialog.</p>
+<h3 id="problem">Problem</h3>
+<p>In the context of emergency contraception, a system dialog feels like a "warning" and amplifies anxiety. The standard OS wording — "This site wants to use your location" — can be frightening in a privacy-sensitive situation.</p>
+<h3 id="solution-inline-privacy-panel">Solution: Inline Privacy Panel</h3>
+<ul>
+<li>A permanent note next to the "📍 Nearest" button: "Your location is never recorded or transmitted"</li>
+<li>On first click: an in-page panel expands with a privacy explanation + "Sort by nearest using location" / "Cancel" buttons</li>
+<li>On subsequent uses: toggle only, no panel (do not re-explain to users who already understand)</li>
+</ul>
+<p>Geolocation is used solely for in-browser distance calculations and is never sent to a server. As a static site, there is no server to send it to.</p>
+<hr>
+<h2 id="6-hours-parser-philosophy">6. Hours Parser Philosophy</h2>
+<p>The MHLW data's <code>hours</code> field contains 6,933 distinct format variations. Rather than aiming for 100% parsing, we adopted a design of <strong>97% accurate parsing + 3% graceful fallback</strong>.</p>
+<h3 id="why-not-aim-for-100">Why Not Aim for 100%?</h3>
+<ul>
+<li>The remaining 3% consists of natural language patterns (e.g., "1st and 3rd Saturday mornings only") or data quality issues that are fundamentally beyond what regex-based parsers can handle</li>
+<li>Pursuing 100% means adding complex logic for rare patterns → difficult maintenance → risk of introducing bugs in the existing accurate parsing</li>
+<li>Even when parsing fails, displaying the raw data as-is allows users to read it themselves. No information is lost</li>
+</ul>
+<h3 id="fallback-strategy">Fallback Strategy</h3>
+<p>Unparseable business hours are displayed as raw data (exactly as recorded by MHLW). "Showing raw data" is safer than "pretending to have parsed it and displaying inaccurate information." With emergency contraception, believing incorrect business hours and arriving at a closed facility can have serious consequences.</p>
+<h3 id="holiday-handling">Holiday Handling</h3>
+<p>Holiday detection is implemented as pure computation with zero external API dependencies (<code>getJapaneseHolidays()</code>, approximately 70 lines). It covers fixed-date holidays, Happy Monday holidays, vernal and autumnal equinoxes (astronomical formulas), substitute holidays (振替休日), and citizens' holidays (国民の休日), valid through approximately 2099.</p>
+<p>Reasons for not depending on external holiday APIs:
+- We do not want to add network-dependent failure points to an emergency tool
+- Japanese holidays are determined by law and are computable (temporary changes due to special legislation are handled through annual checks)</p>
+<hr>
+<h2 id="7-technology-selection-principles">7. Technology Selection Principles</h2>
+<p>The consistent principle is <strong>free, no API key required, static hosting</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Leaflet.js + OpenStreetMap</strong></td>
+<td>Free. Google Maps Platform is paid</td>
+</tr>
+<tr>
+<td><strong>University of Tokyo CSIS Geocoding</strong></td>
+<td>Free, no API key required, address-level precision</td>
+</tr>
+<tr>
+<td><strong>GitHub Pages</strong></td>
+<td>Free static hosting. No server operations required</td>
+</tr>
+<tr>
+<td><strong>Vanilla JS (no framework)</strong></td>
+<td>No build step. Files in <code>docs/</code> are the production build as-is. Fewer dependencies = easier long-term maintenance</td>
+</tr>
+<tr>
+<td><strong>GitHub Actions</strong></td>
+<td>Automated daily data updates. The free tier is sufficient</td>
+</tr>
+</tbody>
+</table>
+<p>For details on the rationale for each technology choice and rejected alternatives, see the <a href="FEATURE_SPEC_EN.html">Feature Spec</a>.</p>
+<h3 id="why-a-static-site">Why a Static Site?</h3>
+<ul>
+<li>We do not want to impose server operation costs and maintenance burden on a personal project</li>
+<li>As an emergency tool, we want to eliminate the risk of server downtime (GitHub Pages offers high availability)</li>
+<li>Data updates are processed as daily batches via GitHub Actions. Real-time updates are unnecessary (MHLW data is updated approximately once per month)</li>
+</ul>
+<hr>
+<h2 id="8-data-pipeline-cache-design">8. Data Pipeline Cache Design</h2>
+<p><code>update_data.py</code> fetches and processes MHLW's XLSX to generate <code>data.json</code>. When a cache file (<code>data/data_*.json</code>) already exists for the same as-of date, the script skips regeneration to avoid unnecessary downloads and noisy git diffs.</p>
+<h3 id="problem-incomplete-cache-key">Problem: Incomplete Cache Key</h3>
+<p>Whether a cache is "valid" should depend on <strong>two inputs combined</strong>:</p>
+<ol>
+<li><strong>Source data</strong> (MHLW XLSX) — identified by the <code>as_of</code> date</li>
+<li><strong>Processing logic</strong> (<code>update_data.py</code> itself) — if the script changes, output changes</li>
+</ol>
+<p>Originally, only the source data match was checked. This meant that when the processing logic was modified (e.g., adding empty record exclusion, adding meta fields), the existing cache was still judged "valid," and the new logic was never applied.</p>
+<p>This has the same structure as a classic build system problem: if you modify source code but do not recompile the object files, the old binary continues to be used.</p>
+<h3 id="solution-input-hashed-cache-invalidation">Solution: Input-Hashed Cache Invalidation</h3>
+<p><code>meta.scriptHash</code> stores the SHA-256 hash (first 16 characters) of the script itself. During cache validation, this hash is compared against the current script's hash. A mismatch triggers a cache miss and regeneration from the XLSX.</p>
+<pre><code>Cache key = as_of date + scriptHash
+  → Same source data + different script → cache miss
+  → Same script + different source data → cache miss
+</code></pre>
+<p>This technique follows the same principle as Docker layer caching, Webpack's contenthash, and Nix/Bazel build hashes: <strong>never use the cache unless all inputs match.</strong></p>
+<h3 id="why-a-hash-instead-of-a-version-number">Why a Hash Instead of a Version Number?</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Manual version number</td>
+<td>Explicit</td>
+<td>Can be forgotten — reproduces the same structural problem as this bug</td>
+</tr>
+<tr>
+<td>Script hash</td>
+<td><strong>Fully automatic.</strong> Impossible to forget</td>
+<td>Comment-only changes also trigger regeneration (no practical impact — regeneration takes seconds)</td>
+</tr>
+</tbody>
+</table>
+<p>Safety mechanisms that depend on manual procedures break the moment the procedure is forgotten. What can be automated, should be automated.</p>
+<h3 id="implementation_1">Implementation</h3>
+<ul>
+<li><strong><code>_script_hash()</code></strong>: <code>Path(__file__).read_bytes()</code> → SHA-256 → first 16 characters</li>
+<li><strong><code>looks_like_valid_app_json()</code></strong>: <code>meta.scriptHash != _script_hash()</code> → <code>False</code> (cache invalid)</li>
+<li><strong>Generation</strong>: <code>meta.scriptHash = _script_hash()</code> embeds the hash</li>
+</ul>
+<hr>
+<h2 id="9-stable-ids-and-partial-failure-protection-for-medical-institutions">9. Stable IDs and Partial-Failure Protection for Medical Institutions</h2>
+<p>Medical institution data (<code>clinics.json</code>) is generated by parsing PDFs from 47 prefectures. Unlike pharmacy data, the PDFs contain no stable facility identifier.</p>
+<h3 id="problem-sequential-id-fragility">Problem: Sequential ID Fragility</h3>
+<p>The original design used sequential IDs (<code>c1, c2, ...</code>). This had two critical problems:</p>
+<ol>
+<li><strong>ID shift</strong>: Adding or removing a single record shifts all subsequent IDs, breaking <code>geocode_cache.json</code> (lat/lng mappings). Map markers for all medical institutions become incorrect</li>
+<li><strong>Partial failure</strong>: If some prefectures fail to download, <code>clinics.json</code> is overwritten with incomplete data. This actually occurred on 2026-03-20 when only 361 records (Tokyo only) were written</li>
+</ol>
+<h3 id="solution-1-hash-based-stable-ids">Solution 1: Hash-Based Stable IDs</h3>
+<p>A SHA-256 hash is computed from <code>(facility name, address)</code>, and the ID is <code>c-</code> + first 8 hex characters.</p>
+<pre><code>ID = c- + SHA256(&quot;name\taddr&quot;)[:8]
+Example: c-a3f8b2e1
+</code></pre>
+<ul>
+<li>Of 3,107 records, <code>(name, addr)</code> is unique for 3,105 (2 are true duplicates in the PDF data, removed during parsing)</li>
+<li>8 hex chars (32 bits) has effectively zero collision probability. Falls back to 12 chars on collision</li>
+<li>Completely deterministic — independent of ordering or prefecture download success</li>
+</ul>
+<h3 id="solution-2-partial-failure-protection-two-layer-check">Solution 2: Partial-Failure Protection (Two-Layer Check)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Condition</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Prefecture coverage</strong></td>
+<td>Any previously present prefecture is missing</td>
+<td>Detects single-prefecture download failure</td>
+</tr>
+<tr>
+<td><strong>Global threshold</strong></td>
+<td>New record count &lt; 80% of previous</td>
+<td>Detects large-scale data loss</td>
+</tr>
+</tbody>
+</table>
+<p>When a check fails, <code>clinics.json</code> is NOT written and the script exits 0 (the GitHub Actions workflow continues, allowing pharmacy geocoding to proceed normally). Override with <code>--force-write</code>.</p>
+<h3 id="geocache-migration">Geocache Migration</h3>
+<p>Migration from old-format IDs (<code>c1, c2, ...</code>) to new-format IDs (<code>c-XXXXXXXX</code>) runs automatically inside <code>update_clinics.py</code>. It fires only when old-format IDs exist in <code>geocode_cache.json</code>, rewrites the keys, and deletes old entries. Automatically skipped after first run.</p>
+<hr>
+<h2 id="related-documents">Related Documents</h2>
+<ul>
+<li><a href="FEATURE_SPEC_EN.html">Feature Spec</a> — Requirements and technical approach for all 4 features</li>
+<li><a href="HOURS_PARSER_EN.html">Hours Parser Design</a> — Detailed design of the multi-stage normalization pipeline</li>
+</ul>
+</div>
 <script>
 fetch('DESIGN_EN.md?v=' + Date.now())
   .then(function(r) { return r.text(); })

@@ -44,7 +44,116 @@ del { color: #888; }
   <a href="https://github.com/odakin/mhlw-ec-pharmacy-finder">📦 GitHub</a>
   <a href="FEATURE_SPEC.html">🇯🇵 日本語</a>
 </div>
-<div id="content">Loading...</div>
+<div id="content">
+<h1 id="mhlw-ec-pharmacy-finder-feature-specification">mhlw-ec-pharmacy-finder Feature Specification</h1>
+<h2 id="overview">Overview</h2>
+<p>This document specifies features to be added to the emergency contraceptive pill (EC) pharmacy finder site: https://odakin.github.io/mhlw-ec-pharmacy-finder/. The goal is to close the gap with competing sites (e.g., EPARK Kusuri no Madoguchi https://www.kusurinomadoguchi.com/s?is_ecp=1) while preserving existing strengths (10,000+ pharmacies from official MHLW data, female pharmacist filter, no-appointment-needed filter, etc.).</p>
+<p><strong>Constraints</strong>:
+- Static hosting on GitHub Pages. No server-side processing
+- Avoid services that require external API keys (e.g., Google Maps Platform); prefer free, key-free alternatives
+- Do not break existing UI/UX. Existing features (prefecture selector, free-text search, checkbox filters) remain as-is</p>
+<hr>
+<h2 id="feature-4-google-maps-link-external-navigation-to-each-pharmacy-implemented">Feature 4: Google Maps Link (External Navigation to Each Pharmacy) -- Implemented</h2>
+<ul>
+<li>A "📍 View on Google Maps" link has been added to each pharmacy card (commit d83b795)</li>
+<li>Link format: <code>https://www.google.com/maps/search/?api=1&amp;query={encodeURIComponent(pharmacyName + ' ' + address)}</code></li>
+<li>No API key required. One click gives access to photos, reviews, Street View, and navigation</li>
+</ul>
+<hr>
+<h2 id="feature-1-map-view-implemented-commits-514ad56-3c3c685">Feature 1: Map View -- Implemented (commits 514ad56, 3c3c685)</h2>
+<h3 id="requirements">Requirements</h3>
+<ul>
+<li>Display search-result pharmacies as pins on a map</li>
+<li>Show a popup with pharmacy name, address, phone number, etc. on pin click/tap</li>
+<li>Include a "View on Google Maps" link inside each popup</li>
+<li>Allow toggling between list view and map view (tabs or toggle)</li>
+<li>Responsive design that works well on mobile</li>
+</ul>
+<h3 id="technical-approach">Technical Approach</h3>
+<ul>
+<li><strong>Map engine</strong>: Leaflet.js + OpenStreetMap tiles (free, no API key)</li>
+<li><strong>Geocoding</strong>: University of Tokyo CSIS Simple Geocoding Service</li>
+<li>Endpoint: <code>https://geocode.csis.u-tokyo.ac.jp/cgi-bin/simple_geocode.cgi?charset=UTF8&amp;addr={address}</code></li>
+<li>Free, no API key, no user registration required</li>
+<li>High accuracy down to house-number level (iLvl 5-8)</li>
+<li>Verified: 9 out of 10 test addresses resolved to house-number level or better. Nominatim failed on all Japanese addresses and was rejected</li>
+<li><strong>Cache design</strong>: <code>data/geocode_cache.json</code> (append-only)</li>
+<li>Structure: <code>{ "66": {"lat": 43.762955, "lng": 142.359726, "lvl": 8, "addr": "original address"}, ... }</code></li>
+<li>ID is the MHLW "pharmacy number" (yakkyoku-tou bangou), which is stable</li>
+<li>Retains data for deleted pharmacies (reusable if re-registered)</li>
+<li>Only new or address-changed entries query CSIS. If CSIS is down, the entry is skipped (daily GitHub Actions run provides automatic retry)</li>
+<li><strong>Incremental updates</strong>: 0.5-second interval. Initial run for 10,128 entries takes ~85 minutes. Subsequent daily runs process only dozens of new entries in seconds</li>
+<li><strong>Frontend delivery</strong>: Copied to <code>docs/geocode_cache.json</code> at build time. Fetched only when the map tab is displayed (keeps initial load light)</li>
+<li><strong>Clustering</strong>: Leaflet.markercluster (loaded via CDN)</li>
+<li>A guidance message is shown when search results exceed 200 entries, but display is not blocked</li>
+<li>Map is hidden on initial load (before any search)</li>
+</ul>
+<hr>
+<h2 id="feature-2-distance-from-current-location-and-sort-by-proximity-implemented-commit-3c3c685">Feature 2: Distance from Current Location and Sort by Proximity -- Implemented (commit 3c3c685)</h2>
+<h3 id="requirements_1">Requirements</h3>
+<ul>
+<li>Add a "Sort by nearest" button</li>
+<li>On button press, obtain the user's current location via the browser Geolocation API, calculate distance to each pharmacy, and sort</li>
+<li>Add an "approx. XX km" distance label to each pharmacy row</li>
+<li>If location access fails (denied/unsupported), show an appropriate error message and fall back to the default sort order</li>
+<li>In map view mode, also show the user's current location as a differently-colored pin</li>
+</ul>
+<h3 id="technical-approach_1">Technical Approach</h3>
+<ul>
+<li>Uses <code>navigator.geolocation.getCurrentPosition()</code></li>
+<li>Haversine formula (straight-line distance) is sufficient; route distance is not needed</li>
+<li>UI informs the user that a location permission dialog will appear</li>
+<li>Sort toggle: switch between default order and nearest-first</li>
+<li>Distance calculation requires latitude/longitude, so Feature 1 (geocoding) is a prerequisite</li>
+</ul>
+<hr>
+<h2 id="feature-3-business-hours-display-implemented-commits-3c3c685-04853e7-parser-coverage-971">Feature 3: Business Hours Display -- Implemented (commits 3c3c685-04853e7, parser coverage 97.1%)</h2>
+<h3 id="challenges">Challenges</h3>
+<ul>
+<li>The <code>hours</code> field has 6,933 distinct format variations</li>
+<li>~80% can be parsed with simple patterns, but ~20% are free-form text</li>
+<li>Misclassification risk is serious given the nature of emergency contraception -- going to a pharmacy that appears "open" but is actually closed is a critical failure</li>
+<li>The Google Maps link (Feature 4) already provides business hour information on Google Maps, so there is some functional overlap</li>
+</ul>
+<h3 id="implementation-details">Implementation Details</h3>
+<ul>
+<li>Multi-stage normalization parser (<code>~</code> -&gt; <code>-</code>, <code>月曜日</code> -&gt; <code>月</code> (Monday), <code>年中無休</code> -&gt; <code>毎日</code> (every day), <code>平日</code> -&gt; <code>月-金</code> (Mon-Fri), <code>24時間</code> -&gt; <code>毎日:0:00-24:00</code> (24 hours), etc.)</li>
+<li><code>splitHoursSegments()</code>: splits comma-less concatenated patterns using lookbehind</li>
+<li><code>parseDaySpecExtended()</code>: handles patterns like <code>土日祝</code> (Sat/Sun/holidays), <code>月-水・金</code> (Mon-Wed &amp; Fri), <code>月火水金</code> (Mon/Tue/Wed/Fri), etc. (holidays are skipped)</li>
+<li>Today's business status is highlighted (Open / Closed / Day off)</li>
+<li>Full weekly schedule shown in a collapsible section</li>
+<li>Unparseable entries (2.9%) display raw data as-is. See <a href="HOURS_PARSER_EN.html">HOURS_PARSER</a> for design details</li>
+<li>Holiday support: national holidays (kokumin no shukujitsu) are determined by pure calculation; holiday closures and holiday-specific hours are displayed correctly</li>
+<li>Late-night business hours (close &gt; 24:00) with date-crossing logic</li>
+<li>All entries include the note: "Please confirm business hours directly with the pharmacy"</li>
+</ul>
+<hr>
+<h2 id="implementation-priority">Implementation Priority</h2>
+<ol>
+<li>~~<strong>Feature 4</strong> (Google Maps Link)~~ -- Done (d83b795)</li>
+<li>~~<strong>Feature 1</strong> (Map View)~~ -- Done (514ad56, 3c3c685)</li>
+<li>~~<strong>Feature 2</strong> (Sort by Proximity)~~ -- Done (3c3c685)</li>
+<li>~~<strong>Feature 3</strong> (Business Hours Display)~~ -- Done (3c3c685-04853e7, 97.1% coverage)</li>
+</ol>
+<h2 id="data-structure-investigated">Data Structure (Investigated)</h2>
+<ul>
+<li><strong>Latitude/longitude: Not present</strong> -- Geocoded via University of Tokyo CSIS (house-number-level accuracy, free)</li>
+<li><strong>Business hours: Present</strong> -- <code>hours</code> field. 6,933 format variations. 97.1% parseable (see <a href="HOURS_PARSER_EN.html">HOURS_PARSER</a>)</li>
+<li><strong>Data loading</strong>: Fetches <code>docs/data.json</code>. 10,128 entries</li>
+<li><strong>Coordinate data loading</strong>: Fetches <code>docs/geocode_cache.json</code> only when map is displayed (separate file to keep initial load light)</li>
+<li><strong>Public directory</strong>: <code>docs/</code> (GitHub Pages)</li>
+<li><strong>Frontend</strong>: <code>docs/index.html</code> + <code>docs/app.js</code> + <code>docs/style.css</code> (vanilla JS, no framework)</li>
+</ul>
+<hr>
+<h2 id="other-decisions">Other Decisions</h2>
+<ul>
+<li><strong>Online reservation integration</strong>: Out of scope -- requires pharmacy-side systems</li>
+<li><strong>Direct pharmacy photos</strong>: Out of scope -- no data source, API costs unrealistic. Google Maps link (Feature 4) serves as an alternative</li>
+<li><strong>User reviews</strong>: Same as above. Google Maps link serves as an alternative</li>
+<li><strong>Nominatim</strong>: Failed on all Japanese addresses (0 out of 10 hits). Rejected</li>
+<li><strong>Google Geocoding API</strong>: High accuracy but paid (~$50). University of Tokyo CSIS provides equivalent accuracy for free. Rejected</li>
+</ul>
+</div>
 <script>
 fetch('FEATURE_SPEC_EN.md?v=' + Date.now())
   .then(function(r) { return r.text(); })

@@ -14,10 +14,10 @@
 docs/                    → GitHub Pages 公開ディレクトリ
   index.html / app.js / style.css  → フロントエンド（バニラJS）
   data.json              → 薬局データ（9,951件。空レコード除外前の厚労省公表件数は10,128件）
-  clinics.json           → 医療機関データ（3,107件、PDFパース）
+  clinics.json           → 医療機関データ（3,105件、PDFパース。安定ハッシュID）
   geocode_cache.json     → ジオコーディング結果（フロントエンド配信用コピー）
-  FEATURE_SPEC.html / HOURS_PARSER.html → ドキュメントHTML（marked.jsで.mdをfetch+render）
-  marked.min.js          → Markdownレンダリング（ローカルバンドル）
+  FEATURE_SPEC.html / HOURS_PARSER.html → ドキュメントHTML（build_docs.pyで静的生成、JSフォールバック付き）
+  marked.min.js          → Markdownレンダリング（JSフォールバック用）
   .nojekyll              → Jekyll無効化
 data/                    → 元データ・キャッシュ
   *.xlsx / *.csv / *.json → 厚労省データ加工済み
@@ -26,6 +26,7 @@ scripts/
   update_data.py         → 公式ページからデータ更新（薬局、XLSX）
   update_clinics.py      → 医療機関PDFパース → clinics.json 生成
   geocode.py             → 東大CSIS APIでジオコーディング（薬局+医療機関の住所→緯度経度）
+  build_docs.py          → docs/*.md → docs/*.html 静的ビルド（SEO対策）
   hooks/pre-commit       → SESSION.md 更新漏れ防止フック
 line_bot/                → LINE Bot サンプル
 AGENTS.md                → コードレビューガイドライン
@@ -67,10 +68,10 @@ docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（
 
 ```json
 {
-  "meta": { "asOf": "2026-02-20", "records": 3107, ... },
+  "meta": { "asOf": "2026-02-20", "records": 3105, ... },
   "data": [
     {
-      "id": "c1",
+      "id": "c-a067f631",
       "pref": "北海道",
       "muni": "江別市",
       "name": "江別市立病院",
@@ -92,7 +93,7 @@ docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（
 
 | 値 | 意味 | 件数（2026-03時点） | サイトでの扱い |
 |---|---|---|---|
-| `"有"` / `"あり"` / `"有 薬品名..."` | **常時在庫あり** — いつ行っても院内に薬がある。その場でもらえる | 2,964件（95%） | **表示対象** |
+| `"有"` / `"あり"` / `"有 薬品名..."` | **常時在庫あり** — いつ行っても院内に薬がある。その場でもらえる | 2,962件（95%） | **表示対象** |
 | `"無"` / `"無（院外処方）"` 等 | **常時在庫なし** — 診察・処方はできるが、薬は院内に常備していない。院外処方箋を持って薬局へ行く必要がある | 136件（4%） | **除外**（※1） |
 | `""` （空欄） | **未回答・不明** | 7件（0.2%） | **除外** |
 

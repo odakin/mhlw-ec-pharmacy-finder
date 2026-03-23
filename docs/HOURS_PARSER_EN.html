@@ -44,7 +44,486 @@ ul, ol { padding-left: 2em; }
   <a href="https://github.com/odakin/mhlw-ec-pharmacy-finder">📦 GitHub</a>
   <a href="HOURS_PARSER.html">🇯🇵 日本語</a>
 </div>
-<div id="content">Loading...</div>
+<div id="content">
+<h1 id="business-hours-parser-design-document">Business Hours Parser Design Document</h1>
+<h2 id="why-is-it-so-complex">Why Is It So Complex?</h2>
+<h3 id="root-cause-free-text-data-from-mhlw">Root Cause: Free-Text Data from MHLW</h3>
+<p>The <code>hours</code> field in the MHLW (Ministry of Health, Labour and Welfare) pharmacy dataset (10,128 records) is <strong>free-form text</strong>. There is no standardized format specified; each prefecture and pharmacy enters data in its own way. The same schedule "Mon-Fri 9:00-18:00" can be written in thousands of different ways.</p>
+<h3 id="the-simple-approach-we-tried-first">The Simple Approach We Tried First</h3>
+<p>The first version (89.4% coverage) only handled "clean" patterns like <code>月-金:9:00-18:00,土:9:00-13:00</code> (Mon-Fri:9:00-18:00,Sat:9:00-13:00). However, more than 10% of records failed to parse due to full-width characters, kanji time notation, parentheses, slashes, typos, and more.</p>
+<h3 id="why-it-grew-complex-incrementally">Why It Grew Complex Incrementally</h3>
+<p>Each time a new rule was added, cases were discovered where it interfered with existing rules' output. For example, converting <code>金9時</code> (Fri 9 o'clock) to <code>金9:00</code> then required a colon insertion step to produce <code>金:9:00</code>. Because <strong>normalization rules have order dependencies</strong>, they cannot be added ad hoc — the entire pipeline's consistency must be maintained.</p>
+<h3 id="the-complexity-in-numbers">The Complexity in Numbers</h3>
+<ul>
+<li>Out of 9,951 records (non-empty hours), there are approximately 6,933 unique formats</li>
+<li><code>normalizeHoursText</code> alone has 75 <code>.replace()</code> calls (~156 lines)</li>
+<li>The entire parser (normalization through rendering) is ~590 lines with ~150 regex patterns</li>
+<li>The result: 97.1% coverage (9,659 records parseable; the remaining 2.9% are natural language, URLs, or bad data)</li>
+</ul>
+<h2 id="architecture-overview">Architecture Overview</h2>
+<pre><code>Raw text
+  |
+  +-&gt; holidayClosed detection (at start of parseHours, before normalization)
+  |
+normalizeHoursText()  &lt;- Text normalization (75 replacement rules)
+  |
+Normalized text (e.g., &quot;月-金:9:00-18:00,土:9:00-13:00&quot;)
+  |
+splitHoursSegments()  &lt;- Split by day-of-week groups
+  |
+Segment array (e.g., [&quot;月-金:9:00-18:00&quot;, &quot;土:9:00-13:00&quot;])
+  |
+parseHours()          &lt;- Extract days + time ranges + holiday info from each segment
+  |
+Structured data: { schedule, holidaySchedule, holidayClosed }
+  |
+getHoursInfo(raw, ctx) &lt;- Determine today's business status (considering holidays &amp; overnight hours)
+  |                        ctx = getJstContext() (compute JST date/time once per batch)
+  |                        isJapaneseHoliday() for holiday detection
+  |
+{ todayRanges, isOpen, isHoliday, holidayClosed, ... }
+  |
+renderHoursHtml(raw, info) &lt;- Generate HTML: badges + weekly schedule + holiday row
+</code></pre>
+<h2 id="normalizehourstext-why-75-rules">normalizeHoursText(): Why 75 Rules?</h2>
+<p>The purpose is to converge input text variations into "one canonical form." Each rule addresses a specific pattern found in real data.</p>
+<h3 id="phase-1-character-level-unification">Phase 1: Character-Level Unification</h3>
+<p><strong>Why this comes first</strong>: All subsequent rules assume half-width, standard characters like <code>9:00</code>, <code>-</code>, <code>月</code> (Mon). Without this unification, every subsequent regex would need both full-width and half-width variants, making maintenance impossible.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Input example</th>
+<th>Output</th>
+<th>Why needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full-width digits -&gt; half-width</td>
+<td><code>９：００</code></td>
+<td><code>9:00</code></td>
+<td>Full-width mixing is very common</td>
+</tr>
+<tr>
+<td>Colon-like unification</td>
+<td><code>：</code> <code>∶</code> <code>︓</code> <code>ː</code></td>
+<td><code>:</code></td>
+<td>5 types of colon-like characters exist in real data</td>
+</tr>
+<tr>
+<td>Tilde variants -&gt; <code>~</code></td>
+<td><code>～</code> <code>〜</code> <code>∼</code></td>
+<td><code>~</code></td>
+<td>4 types of range symbols</td>
+</tr>
+<tr>
+<td>Dash variants -&gt; <code>-</code></td>
+<td><code>－</code> <code>‐</code> <code>−</code> <code>–</code> <code>—</code> <code>ー</code> <code>―</code> <code>ｰ</code></td>
+<td><code>-</code></td>
+<td>9 types of hyphens/dashes exist</td>
+</tr>
+<tr>
+<td>Punctuation unification</td>
+<td><code>､</code> <code>、</code> <code>，</code></td>
+<td><code>,</code></td>
+<td>Delimiter variation</td>
+</tr>
+<tr>
+<td>CJK compatibility chars</td>
+<td><code>⽉</code> <code>⼟</code> <code>⽇</code></td>
+<td><code>月</code> <code>土</code> <code>日</code> (Mon, Sat, Sun)</td>
+<td>Unicode compatibility-area characters found in some data</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Real example</strong>: One prefecture's entire dataset used <code>⽉⽕⽔⽊⾦⼟⽇</code> (CJK compatibility forms) for all day-of-week characters.
+They look identical to <code>月火水</code> (Mon Tue Wed) visually, but have different Unicode code points, so the regex <code>[月火水]</code> does not match them.</p>
+</blockquote>
+<h3 id="phase-2-japanese-expression-normalization">Phase 2: Japanese Expression Normalization</h3>
+<p><strong>Why needed</strong>: The same day of the week can be written three ways: <code>月</code> <code>月曜</code> <code>月曜日</code> (Mon / Monday / Monday-day). There are also Japanese abbreviations like <code>平日</code> (weekdays) and <code>年中無休</code> (open year-round). Without unifying days to single characters, the day-of-week parser (<code>parseDaySpec</code>) would face combinatorial explosion.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Input example</th>
+<th>Output</th>
+<th>Why needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Day-of-week suffix stripping</td>
+<td><code>月曜日</code> <code>金曜</code></td>
+<td><code>月</code> <code>金</code> (Mon, Fri)</td>
+<td>Single char suffices. But <code>金曜日曜</code> -&gt; <code>金日</code> (see below)</td>
+</tr>
+<tr>
+<td>Range-end + day adjacency</td>
+<td><code>月-金日</code> (after stripping)</td>
+<td><code>月-金・日</code> (Mon-Fri + Sun)</td>
+<td>Stripping <code>曜</code> causes <code>金</code> (Fri) and <code>日</code> (Sun) to merge</td>
+</tr>
+<tr>
+<td><code>年中無休</code> -&gt; <code>毎日</code></td>
+<td><code>年中無休</code> (open year-round)</td>
+<td><code>毎日</code> (every day)</td>
+<td>Day-unspecified expression</td>
+</tr>
+<tr>
+<td><code>平日</code> -&gt; <code>月-金</code></td>
+<td><code>平日</code> (weekdays)</td>
+<td><code>月-金</code> (Mon-Fri)</td>
+<td>Japanese abbreviation</td>
+</tr>
+<tr>
+<td><code>24時間</code> -&gt; all day</td>
+<td><code>24時間</code> (24 hours)</td>
+<td><code>毎日:0:00-24:00</code> (every day:0:00-24:00)</td>
+<td></td>
+</tr>
+<tr>
+<td><code>時</code>/<code>分</code> notation</td>
+<td><code>9時30分</code> <code>18時</code></td>
+<td><code>9:30</code> <code>18:00</code></td>
+<td>Kanji time notation (hour/minute)</td>
+</tr>
+<tr>
+<td><code>から</code> -&gt; <code>-</code></td>
+<td><code>月から金</code> <code>9:00から18:00</code> (Mon to Fri, 9:00 to 18:00)</td>
+<td><code>月-金</code> <code>9:00-18:00</code></td>
+<td>Hiragana conjunction ("from...to")</td>
+</tr>
+<tr>
+<td><code>は</code>/<code>が</code> -&gt; <code>:</code></td>
+<td><code>月は9:00</code> <code>水が8:00</code> (Mon is 9:00, Wed is 8:00)</td>
+<td><code>月:9:00</code> <code>水:8:00</code></td>
+<td>Particles used as delimiters</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Tricky case: Greedy match on <code>金曜日曜</code> (Friday + Sunday)</strong>
+Stripping <code>曜日?</code> from <code>月曜-金曜日曜9:00-18:00</code> (Mon-Fri-Sun 9:00-18:00) causes <code>金曜日</code> (Friday) to match greedily, consuming the <code>日</code> (Sun) character, and Sunday disappears.
+Fix: <code>曜(?:日(?!曜))?</code> — do not consume <code>日</code> if followed by <code>曜</code> (it's the start of the next day-of-week).
+An additional rule was then needed to separate <code>月-金日</code> (Mon-FriSun) into <code>月-金・日</code> (Mon-Fri + Sun) after stripping.</p>
+</blockquote>
+<h3 id="phase-3-delimiter-normalization">Phase 3: Delimiter Normalization</h3>
+<p><strong>Why needed</strong>: parseHours recognizes only the <code>day:time</code> format. But input data uses the following as delimiters between day-of-week and time:</p>
+<ul>
+<li>Colon <code>:</code> (standard)</li>
+<li>Space: <code>月-金 9:00</code></li>
+<li>Direct concatenation: <code>月-金9:00</code></li>
+<li>Slash: <code>月-金/9:00</code></li>
+<li>Semicolon: <code>月-金;9:00</code></li>
+<li>Parentheses: <code>(月火金)9:00</code>, <code>月火木）9:15</code></li>
+<li>Square/corner brackets: <code>［月-金］9:00</code>, <code>【月】9:00</code></li>
+</ul>
+<p>All are unified to the <code>day:time</code> format.</p>
+<p>Segment delimiters are similarly varied:
+- Comma <code>,</code> (standard)
+- Slash: <code>月-金:9:00/土:9:00</code>
+- Period: <code>月-金:8:30.土:8:30</code>
+- Space: <code>月-金:9:00 土:9:00</code>
+- Japanese period: <code>｡</code>
+- Direct concatenation: <code>月-金:9:00-18:00土:9:00-13:00</code></p>
+<h3 id="phase-4-time-format-correction">Phase 4: Time Format Correction</h3>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Input example</th>
+<th>Output</th>
+<th>Why needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3-4 digit times</td>
+<td><code>1800</code> <code>900</code></td>
+<td><code>18:00</code> <code>9:00</code></td>
+<td>Colon omitted</td>
+</tr>
+<tr>
+<td>Minutes omitted</td>
+<td><code>9-18:00</code></td>
+<td><code>9:00-18:00</code></td>
+<td>Start time <code>:00</code> omitted</td>
+</tr>
+<tr>
+<td><code>.</code> -&gt; <code>:</code></td>
+<td><code>18.30</code></td>
+<td><code>18:30</code></td>
+<td>Period as time separator</td>
+</tr>
+<tr>
+<td>Double colon</td>
+<td><code>水::9:00</code></td>
+<td><code>水:9:00</code> (Wed:9:00)</td>
+<td>Typo</td>
+</tr>
+<tr>
+<td>Consecutive time ranges</td>
+<td><code>14:0015:00</code></td>
+<td><code>14:00 15:00</code></td>
+<td>Missing delimiter</td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-5-closed-day-and-holiday-information-extraction-and-removal">Phase 5: Closed-Day and Holiday Information Extraction and Removal</h3>
+<p><strong>Two-stage processing</strong>: With the addition of holiday support, this phase became a two-stage process: "extract then remove."</p>
+<h4 id="5a-holiday-information-extraction-inside-parsehours-before-normalization">5a: Holiday Information Extraction (inside parseHours, before normalization)</h4>
+<p><code>parseHours()</code> extracts holiday-related information from the raw text <strong>before</strong> normalization:</p>
+<ol>
+<li><strong>holidayClosed flag</strong>: Patterns like <code>祝休み</code> (holidays closed), <code>日祝:閉局</code> (Sun/holidays: closed), <code>定休日:日・祝</code> (regular holidays: Sun + holidays), <code>祝を除く</code> (excluding holidays), etc. are detected using 6 regex patterns. These strings would be removed during normalization, so they must be detected first.</li>
+<li><strong>holidaySchedule</strong>: After normalization and segment splitting, holiday business hours like <code>祝:9:00-17:00</code> (holidays: 9:00-17:00) are captured and stored in the <code>holidaySchedule</code> array.</li>
+</ol>
+<pre><code>月-金:9:00-18:00,日祝:休み → holidayClosed = true
+  (Mon-Fri:9:00-18:00, Sun/holidays: closed)
+月-金:9:00-18:00,祝:9:00-12:00 → holidaySchedule = [{open:&quot;9:00&quot;, close:&quot;12:00&quot;}]
+  (Mon-Fri:9:00-18:00, holidays:9:00-12:00)
+</code></pre>
+<h4 id="5b-closed-day-text-removal-inside-normalizehourstext">5b: Closed-Day Text Removal (inside normalizeHoursText)</h4>
+<p>After extraction, closed-day text is removed during the normalization pipeline. The day-of-week parser outputs <code>{days, open, close}</code> arrays and has no type to represent "closed." Leaving the text in causes parse failures that drag down otherwise-parseable business hours to raw-data display. By removing it, only business days are structured, and closed days are implicitly represented as "not in the schedule = closed."</p>
+<pre><code>月-金:9:00-18:00,土日祝休み      → 月-金:9:00-18:00
+  (Mon-Fri:..., Sat/Sun/holidays closed)
+月-金:9:00-18:00,日祝:定休       → 月-金:9:00-18:00
+  (Mon-Fri:..., Sun/holidays: regular holiday)
+月-金:9:00-18:00,休:日祝         → 月-金:9:00-18:00
+  (Mon-Fri:..., closed: Sun/holidays)
+月-金:9:00-18:00 日              → 月-金:9:00-18:00
+  (Mon-Fri:... Sun — trailing bare day-of-week = closed)
+月-金:9:00-18:00,水日祝は        → 月-金:9:00-18:00
+  (Mon-Fri:..., Wed/Sun/holidays [closed])
+</code></pre>
+<h3 id="phase-6-ordinal-day-nth-weekday-handling">Phase 6: Ordinal Day (Nth weekday) Handling</h3>
+<p><strong>Why skip</strong>: <code>第1・3土曜:9:00-12:00</code> (1st &amp; 3rd Sat: 9:00-12:00) means "open only on the 1st and 3rd Saturdays of the month." A weekly schedule (<code>{days, open, close}</code>) cannot represent "which week's which day."</p>
+<p>Initially, the plan was to "strip the ordinal and treat it as a regular weekday" (i.e., display as every Saturday). However, <strong>the user pointed out that this is incorrect — it changes the meaning of the information.</strong> Displaying "1st &amp; 3rd Saturday only" as "every Saturday" would cause people to visit on the 2nd, 4th, and 5th Saturdays. Since this information relates to medication access, <strong>missing information is better than wrong information</strong> — that was the design decision.</p>
+<p>During normalization:
+- Kanji numerals to Arabic: <code>第一土</code> (1st Sat) -&gt; <code>第1土</code>
+- Ordinal separator unification: <code>第1,3,5</code> / <code>第1.3.5</code> -&gt; <code>第1・3・5</code>
+- Parenthesized ordinal + time range: <code>(第2,4木:9:00-19:30)</code> ((2nd,4th Thu:9:00-19:30)) -&gt; removed</p>
+<p>During parseHours:
+- <code>土(第1-3):8:30-18:00</code> (Sat (1st-3rd):...) -&gt; skip Sat (ordinal-limited, not weekly)
+- <code>水・土(第1・3・4):9:00-13:00</code> (Wed + Sat(1st,3rd,4th):...) -&gt; keep only Wed, skip Sat(1st,3rd,4th)
+- <code>月-金,第1・3・5土:9:00-19:00</code> (Mon-Fri, 1st/3rd/5th Sat:...) -&gt; keep only Mon-Fri, skip ordinal Sat</p>
+<p><strong>Design decision</strong>: Missing information is acceptable, but <strong>displaying incorrect information is not</strong>. It is better for Saturday information to be absent than to mislead users into thinking "this pharmacy is open on Saturdays."</p>
+<h2 id="splithourssegments-why-simple-split-doesnt-work">splitHoursSegments(): Why Simple Split Doesn't Work</h2>
+<p><strong>Initially it was just <code>.split(",")</code>.</strong> But since the meaning of commas changes with context, simple splitting broke in many cases:</p>
+<ol>
+<li><strong>Segment delimiter</strong>: <code>月-金:9:00-18:00,土:9:00-13:00</code> (Mon-Fri and Sat are separate groups)</li>
+<li><strong>Time range delimiter</strong>: <code>月-金:9:00-13:00,14:00-18:00</code> (AM and PM sessions — split shift)</li>
+<li><strong>Day enumeration</strong>: <code>月,水,金:9:00-18:00</code> (Mon, Wed, Fri share the same hours)</li>
+</ol>
+<p>Algorithm:
+1. First split at boundaries where a time is followed by a day-of-week (<code>9:00-18:00土:</code> -&gt; 2 segments)
+2. Within each segment, split by comma and merge using heuristics:
+   - "day + time" -&gt; new segment
+   - "time only" -&gt; append to previous segment (AM/PM split shift)
+   - "day only" -&gt; merge with next element (<code>月,水,金:9:00</code> -&gt; <code>月・水・金:9:00</code>)</p>
+<h2 id="parsetimerange-time-validation">parseTimeRange(): Time Validation</h2>
+<p><strong>Why allow up to 29:59</strong>: In Japanese convention, late-night hours are written as <code>25:00</code> (= 1:00 AM the next day). Rejecting times after <code>24:00</code> would reject valid data. An upper limit of 29:59 is sufficient in practice.</p>
+<p><strong>Why validation is needed</strong>: The source data contains typos:
+- <code>8:30-6:00</code> — probably <code>8:30-16:00</code> or <code>8:30-18:00</code>
+- <code>9:00-1:30</code> — probably <code>9:00-13:00</code></p>
+<p>Without validation, <code>80:30</code> or <code>88:50</code> would also pass (both actually occurred). Range checking for hours 0-29 and minutes 0-59 catches these, falling back to raw data display.</p>
+<h2 id="expanddayrange-wrap-around-handling">expandDayRange(): Wrap-Around Handling</h2>
+<p><strong>Why do-while</strong>: <code>月-日</code> (Mon-Sun) means "Monday through Sunday = all 7 days." Internal day-of-week numbers are <code>日(Sun)=0, 月(Mon)=1, ..., 土(Sat)=6</code>, so <code>月(1)-日(0)</code> wraps as <code>1-&gt;2-&gt;3-&gt;4-&gt;5-&gt;6-&gt;0</code>.</p>
+<p>The initial implementation was <code>for (i=start; i&lt;=end; i++)</code>. For <code>月-日</code> (Mon-Sun), <code>1&lt;=0</code> was immediately false, producing an empty array and a parse failure. Fixed with <code>do-while</code> + modular arithmetic to correctly handle wrap-around.</p>
+<h2 id="parsedayspecextended-compound-day-of-week-specifications">parseDaySpecExtended(): Compound Day-of-Week Specifications</h2>
+<p><code>parseDaySpec()</code> handles only simple patterns (<code>月-金</code> (Mon-Fri) or <code>月・火・木</code> (Mon/Tue/Thu)). <code>parseDaySpecExtended()</code> handles the following compound patterns:</p>
+<ul>
+<li>Range + individual: <code>月-水・金</code> -&gt; [Mon, Tue, Wed, Fri]</li>
+<li>Consecutive characters: <code>月火水金</code> -&gt; [Mon, Tue, Wed, Fri] (enumeration without <code>・</code> separators)</li>
+<li>Comma-separated: <code>月,火,水,金</code> -&gt; [Mon, Tue, Wed, Fri]</li>
+<li>Mixed: <code>月-水,金,土日祝</code> -&gt; [Mon, Tue, Wed, Fri, Sat, Sun] (<code>祝</code> (holiday) is skipped)</li>
+</ul>
+<h2 id="why-the-remaining-29-cannot-be-parsed">Why the Remaining 2.9% Cannot Be Parsed</h2>
+<p>Main causes for the 292 unparseable records:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Example</th>
+<th>Count (approx.)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Exception conditions inside parentheses</td>
+<td><code>月～金：9:00-17:00、（13:00-14:00は閉局）</code> (Mon-Fri:9:00-17:00, (closed 13:00-14:00))</td>
+<td>~50</td>
+</tr>
+<tr>
+<td>Per-day descriptions (tab-separated)</td>
+<td><code>月\t09:00～19:00火\t09:00～19:00...</code> (Mon\t09:00-19:00 Tue\t09:00-19:00...)</td>
+<td>~20</td>
+</tr>
+<tr>
+<td>URLs</td>
+<td><code>https://www.example.com</code></td>
+<td>A few</td>
+</tr>
+<tr>
+<td>No time range</td>
+<td><code>月-金:</code> (Mon-Fri:)</td>
+<td>A few</td>
+</tr>
+<tr>
+<td>Natural-language conditions</td>
+<td><code>お客様感謝デーを除く</code> (except customer appreciation days) <code>隔週で17:00まで</code> (until 17:00 every other week)</td>
+<td>~30</td>
+</tr>
+<tr>
+<td>Mismatched parentheses</td>
+<td><code>土(第２，4:8:30-17:00)</code> (Sat(2nd,4th:8:30-17:00))</td>
+<td>~20</td>
+</tr>
+<tr>
+<td>Bad data</td>
+<td><code>9:00-8:00</code> <code>8:30-6:00</code></td>
+<td>~10</td>
+</tr>
+</tbody>
+</table>
+<p>The cost of handling these individually (increased code complexity) yields only marginal coverage improvement, so they fall back to raw data display.</p>
+<h2 id="holiday-support">Holiday Support</h2>
+<h3 id="why-consider-holidays">Why Consider Holidays</h3>
+<p>The business hours data contains holiday-related information such as <code>祝日休み</code> (closed on holidays) and <code>日祝:9:00-12:00</code> (Sun/holidays: 9:00-12:00), but the initial implementation did not check whether today is a holiday. This resulted in:</p>
+<ul>
+<li>A pharmacy with <code>月-金:9:00-18:00,日祝休み</code> (Mon-Fri:9:00-18:00, closed Sun/holidays) showing as "Open" on a holiday Monday</li>
+<li>In reality it's closed -&gt; the user makes a wasted trip</li>
+</ul>
+<h3 id="three-layer-architecture">Three-Layer Architecture</h3>
+<pre><code>Layer B: getJapaneseHolidays(year) / isJapaneseHoliday(date)
+  -&gt; Pure computation (~60 lines). Zero external dependencies, valid through ~2099
+  -&gt; Fixed dates, Happy Monday, vernal/autumnal equinox (astronomical formula),
+     substitute holidays, citizens' holidays
+
+Layer A: parseHours() extension
+  -&gt; Detect holidayClosed (holiday-closed flag) from raw text via regex
+  -&gt; Extract holidaySchedule (holiday business hours) from post-normalization segments
+  -&gt; Existing day-of-week parsing is completely unchanged
+
+Layer C: getHoursInfo() extension
+  -&gt; Use isJapaneseHoliday(today) for holiday detection
+  -&gt; holidayClosed -&gt; show as closed
+  -&gt; holidaySchedule -&gt; use holiday hours
+  -&gt; Neither -&gt; fall back to regular weekday schedule
+</code></pre>
+<h3 id="holidayclosed-detection">holidayClosed Detection</h3>
+<p>Detected via 6 regex patterns against the raw text (before normalization):
+- <code>祝休み</code> <code>祝:休み</code> <code>祝は休業</code> (holiday closed — forward patterns)
+- <code>休業日:日祝</code> <code>定休日:日・祝</code> (closed days: Sun/holidays — reverse patterns)
+- <code>祝を除く</code> <code>(祝除く)</code> (excluding holidays — exclusion expressions)
+- <code>祝祭日</code> (national holidays) -&gt; normalized to <code>祝</code>; half-width katakana middle dot <code>･</code> is also normalized</p>
+<p>Detection rate: 137 / 152 cases (remaining 15 require parser core changes, high cost). False positives: 0.</p>
+<h3 id="overnight-hours-cross-midnight-determination">Overnight Hours: Cross-Midnight Determination</h3>
+<p>For time slots where <code>close &gt; 24:00</code> (e.g., 25:00 = 1:00 AM the next day):
+- Check the previous day's schedule and use <code>nowMin &lt; closeMin - 1440</code> for determination
+- If the previous day was a holiday, the holiday override is also considered</p>
+<h3 id="performance-getjstcontext">Performance: getJstContext()</h3>
+<p>The <code>toLocaleString("en-US", {timeZone: "Asia/Tokyo"})</code> call inside <code>getHoursInfo()</code> is expensive. Calling it per card means ~50 calls per search, which is wasteful. The design was changed to compute JST date/time once per batch via <code>getJstContext()</code> and pass it as <code>getHoursInfo(raw, ctx)</code>.</p>
+<h2 id="code-notes">Code Notes</h2>
+<h3 id="normalization-rule-order-dependencies">Normalization Rule Order Dependencies</h3>
+<p>Many rules depend on the output of previous rules. Examples:</p>
+<ol>
+<li>The <code>時</code> (hour) -&gt; <code>:00</code> conversion must run after day-of-week stripping (<code>金9時</code> -&gt; <code>金9:00</code> -&gt; <code>金:9:00</code>)</li>
+<li>Colon insertion (<code>金9:00</code> -&gt; <code>金:9:00</code>) must re-run after the <code>時</code> conversion</li>
+<li>Tilde-to-dash conversion must also re-run after <code>時</code> conversion (new <code>9:00~18:00</code> instances are generated)</li>
+<li>Closed-day stripping must run after the <code>お休み</code> -&gt; <code>休み</code> conversion</li>
+</ol>
+<p><strong>Changing rule order requires regression testing against the full dataset.</strong></p>
+<h3 id="parsehours-design-policy-why-no-partial-parse-results">parseHours Design Policy: Why No Partial Parse Results</h3>
+<p>When an unparseable segment is encountered, the <strong>entire parse fails</strong> (<code>return null</code>).</p>
+<p><strong>Reason</strong>: If <code>月-金:9:00-18:00,土:???,日:9:00-14:00</code> (Mon-Fri:..., Sat:???, Sun:...) skips only Saturday and returns Mon-Fri + Sun, the user would misunderstand that "this pharmacy is not open on Saturday." In reality, it may well be open on Saturday. Failing entirely and showing raw data lets the user judge for themselves.</p>
+<p>Exceptions where graceful skipping is allowed are cases where skipping does not distort information:
+- "Closed" segments (not operating anyway)
+- Holiday segments (outside the scope of weekly schedules)
+- Ordinal segments (Nth-weekday-only cannot be represented weekly; skipping is correct)
+- Invalid time ranges (data typos)</p>
+<h3 id="testing-method">Testing Method</h3>
+<pre><code class="language-sh"># Coverage test
+node -e '
+const code = require(&quot;fs&quot;).readFileSync(&quot;docs/app.js&quot;,&quot;utf8&quot;);
+const endIdx = code.indexOf(&quot;function timeToMinutes&quot;);
+global.document = {getElementById:()=&gt;null};
+eval(code.substring(0, endIdx));
+const data = require(&quot;./docs/data.json&quot;).data;
+let total=0, ok=0;
+for (const r of data) {
+  if (!r.hours?.trim()) continue;
+  total++;
+  const p = parseHours(r.hours);
+  if (p?.schedule?.length) ok++;
+}
+console.log(ok + &quot;/&quot; + total + &quot; = &quot; + (ok/total*100).toFixed(1) + &quot;%&quot;);
+'
+</code></pre>
+<h2 id="revision-history">Revision History</h2>
+<table>
+<thead>
+<tr>
+<th>Commit</th>
+<th>Description</th>
+<th>Coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3c3c685</td>
+<td>Initial parser</td>
+<td>89.4%</td>
+</tr>
+<tr>
+<td>4fb20eb</td>
+<td>6 normalization improvements</td>
+<td>95.7%</td>
+</tr>
+<tr>
+<td>39c4597</td>
+<td>Ordinal day support</td>
+<td>96.6%</td>
+</tr>
+<tr>
+<td>03987aa</td>
+<td>Fix Sat(Nth) skip (prevent information distortion)</td>
+<td>96.3%</td>
+</tr>
+<tr>
+<td>0580d00</td>
+<td>Ordinal handling refactor</td>
+<td>96.9%</td>
+</tr>
+<tr>
+<td>8d48a6a</td>
+<td>Deep validation bug fix</td>
+<td>97.1%</td>
+</tr>
+<tr>
+<td>04853e7</td>
+<td>Fix greedy match on <code>金曜日曜</code> (FridaySunday)</td>
+<td>97.1%</td>
+</tr>
+<tr>
+<td>c3a7f62</td>
+<td>Holiday support (3-layer architecture), Monday-start week</td>
+<td>97.1%</td>
+</tr>
+<tr>
+<td>85870b8</td>
+<td>holidayClosed regex expansion (125-&gt;137 cases), overnight isOpen fix, double parse elimination</td>
+<td>97.1%</td>
+</tr>
+<tr>
+<td>d3091c7</td>
+<td>Performance improvement via getJstContext()</td>
+<td>97.1%</td>
+</tr>
+</tbody>
+</table>
+</div>
 <script>
 fetch('HOURS_PARSER_EN.md?v=' + Date.now())
   .then(function(r) { return r.text(); })
