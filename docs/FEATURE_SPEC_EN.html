@@ -107,7 +107,7 @@ del { color: #888; }
 <li>Distance calculation requires latitude/longitude, so Feature 1 (geocoding) is a prerequisite</li>
 </ul>
 <hr>
-<h2 id="feature-3-business-hours-display-implemented-commits-3c3c685-04853e7-parser-coverage-971">Feature 3: Business Hours Display -- Implemented (commits 3c3c685-04853e7, parser coverage 97.1%)</h2>
+<h2 id="feature-3-business-hours-display-implemented-parser-coverage-pharmacy-982-clinic-883">Feature 3: Business Hours Display -- Implemented (parser coverage: pharmacy 98.2% / clinic 88.3%)</h2>
 <h3 id="challenges">Challenges</h3>
 <ul>
 <li>The <code>hours</code> field has 6,933 distinct format variations</li>
@@ -133,12 +133,12 @@ del { color: #888; }
 <li>~~<strong>Feature 4</strong> (Google Maps Link)~~ -- Done (d83b795)</li>
 <li>~~<strong>Feature 1</strong> (Map View)~~ -- Done (514ad56, 3c3c685)</li>
 <li>~~<strong>Feature 2</strong> (Sort by Proximity)~~ -- Done (3c3c685)</li>
-<li>~~<strong>Feature 3</strong> (Business Hours Display)~~ -- Done (3c3c685-04853e7, 97.1% coverage)</li>
+<li>~~<strong>Feature 3</strong> (Business Hours Display)~~ -- Done (pharmacy 98.2% / clinic 88.3% coverage)</li>
 </ol>
 <h2 id="data-structure-investigated">Data Structure (Investigated)</h2>
 <ul>
 <li><strong>Latitude/longitude: Not present</strong> -- Geocoded via University of Tokyo CSIS (house-number-level accuracy, free)</li>
-<li><strong>Business hours: Present</strong> -- <code>hours</code> field. 6,933 format variations. 97.1% parseable (see <a href="HOURS_PARSER_EN.html">HOURS_PARSER</a>)</li>
+<li><strong>Business hours: Present</strong> -- <code>hours</code> field. Pharmacy 98.2% / clinic 88.3% parseable (see <a href="HOURS_PARSER_EN.html">HOURS_PARSER</a>)</li>
 <li><strong>Data loading</strong>: Fetches <code>docs/data.json</code>. 10,128 entries</li>
 <li><strong>Coordinate data loading</strong>: Fetches <code>docs/geocode_cache.json</code> only when map is displayed (separate file to keep initial load light)</li>
 <li><strong>Public directory</strong>: <code>docs/</code> (GitHub Pages)</li>

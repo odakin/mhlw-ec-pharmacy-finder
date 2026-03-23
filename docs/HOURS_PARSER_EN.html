@@ -58,7 +58,7 @@ ul, ol { padding-left: 2em; }
 <li>Out of 9,951 records (non-empty hours), there are approximately 6,933 unique formats</li>
 <li><code>normalizeHoursText</code> alone has 75 <code>.replace()</code> calls (~156 lines)</li>
 <li>The entire parser (normalization through rendering) is ~590 lines with ~150 regex patterns</li>
-<li>The result: 97.1% coverage (9,659 records parseable; the remaining 2.9% are natural language, URLs, or bad data)</li>
+<li>The result: pharmacy 98.2% coverage (9,768 parseable), clinic 88.3% coverage (2,739 parseable). Remaining failures are natural language, URLs, or bad data</li>
 </ul>
 <h2 id="architecture-overview">Architecture Overview</h2>
 <pre><code>Raw text

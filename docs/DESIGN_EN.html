@@ -95,15 +95,15 @@ ul, ol { padding-left: 2em; }
 <blockquote>
 <p>Primary source + alternatives available + practical benefit of noise removal. Exclusion is justified.</p>
 </blockquote>
-<h4 id="example-currently-open-filter-not-implemented">Example: "Currently Open" filter → Not implemented</h4>
-<p>This seems useful at first glance, but is intentionally not implemented.</p>
+<h4 id="example-currently-available-filter-not-implemented-implemented-as-user-initiated-filter">Example: "Currently Available" filter → ~~Not implemented~~ Implemented as user-initiated filter</h4>
+<p>Initially decided against implementation. However, parser improvements (pharmacy 98.2%, clinic 88.3%) and the "unknown badge" design changed the 3-axis evaluation:</p>
 <ul>
-<li><strong>Source</strong>: Estimated by the hours parser (secondary processing). Coverage is 97.1%, meaning approximately 290 facilities cannot have their operating status determined</li>
-<li><strong>Alternatives</strong>: The nearest pharmacy might be one of those unparseable entries — no alternative exists</li>
-<li><strong>Harm of not excluding</strong>: None. The current design of displaying business hours on each card is sufficient</li>
+<li><strong>Source</strong>: Parser estimation (secondary), but time determination is accurate for successfully parsed records. The filter only hides "parsed AND outside hours AND no after-hours service"</li>
+<li><strong>Alternatives</strong>: Unparseable facilities shown with "Status Unknown" badge. After-hours pharmacies shown with "After-Hours Available" badge. No facilities silently removed</li>
+<li><strong>Harm of not excluding</strong>: At 10pm in Tokyo, 40 of 50 results are "Outside Hours". Scrolling on mobile to find 10 open ones is real friction in an emergency</li>
 </ul>
 <blockquote>
-<p>Secondary processing creates a risk of inadvertently hiding useful options as collateral damage, and there is no harm in not excluding. The conditions differ from the stock filter on all three axes.</p>
+<p>Hides only "confirmed closed (no after-hours)" facilities. Uncertain records (unparseable) and after-hours pharmacies remain visible. Default OFF (user-initiated). The former "After-Hours Available" checkbox was merged into this filter. Badge system: green (Open) / blue (After-Hours Available) / gray (Closed) / amber (Status Unknown). See <a href="../NOW_OPEN_FILTER.md">NOW_OPEN_FILTER.md</a> for full design rationale.</p>
 </blockquote>
 <h3 id="user-initiated-filters-user-turns-them-on">User-Initiated Filters (User Turns Them ON)</h3>
 <p>Because everything is visible when the filter is OFF, the criteria are more relaxed than for default exclusion:</p>
