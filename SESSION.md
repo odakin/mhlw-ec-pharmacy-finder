@@ -101,4 +101,5 @@
 ## 残タスク
 
 - [ ] 全機能のライブサイトテスト（近い順は位置情報が必要）
-- [ ] clinics.json 再生成（update_clinics.py の obgyn/stock 正規化を反映。次回の GitHub Actions 日次実行で自動適用、または `--local-dir` で手動実行）
+- [x] clinics.json 再生成（手動実行で反映済み 2026-03-24）
+- [ ] `normalize_stock()` 拡張: `"16:00-17:30あり"` 等の時間限定在庫パターンを正規化
