@@ -177,9 +177,6 @@ def normalize_stock(val: str) -> str:
     m = re.match(r'^(\d{1,2}:\d{2}[-～〜]\d{1,2}:\d{2})\s*(?:あり|有)', s)
     if m:
         return f'有（{m.group(1)}）'
-    # Trailing "あり" with prefix conditions (but not "院外...に有" etc.)
-    if re.search(r'あり$', s) and not re.search(r'薬局|院外|処方', s):
-        return f'有（{s.replace("あり", "").strip()}）'
     return s
 
 
