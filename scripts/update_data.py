@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -29,6 +30,19 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 import pandas as pd
+
+def _script_hash() -> str:
+    """Hash of this script — changes whenever the processing logic changes.
+
+    Used as a cache key: if the script is modified, cached outputs are
+    automatically invalidated and regenerated from the source XLSX.
+    This follows the same principle as Docker layer caching or Nix
+    derivation hashes — all inputs (source data + processing logic)
+    must match for the cache to be valid.
+    """
+    content = Path(__file__).resolve().read_bytes()
+    return hashlib.sha256(content).hexdigest()[:16]
+
 
 def _norm_col(x):
     import re as _re
@@ -302,6 +316,7 @@ def looks_like_valid_app_json(path: Path, as_of: str) -> bool:
     We only skip when:
     - JSON parses
     - meta.asOf matches
+    - meta.scriptHash matches current script (input-hashed cache invalidation)
     - data is a list
     - at least one record has the keys the web UI expects
     """
@@ -317,6 +332,9 @@ def looks_like_valid_app_json(path: Path, as_of: str) -> bool:
     if not isinstance(meta, dict) or not isinstance(data, list):
         return False
     if meta.get("asOf") != as_of:
+        return False
+    # If the script has changed since this cache was generated, regenerate.
+    if meta.get("scriptHash") != _script_hash():
         return False
 
     # Find the first dict-like record
@@ -611,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
             "generatedAt": datetime.datetime.now().isoformat(timespec="seconds"),
             "records": len(records),
             "totalPublished": total_published,
+            "scriptHash": _script_hash(),
         },
         "data": records,
     }
