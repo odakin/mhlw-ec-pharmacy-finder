@@ -265,7 +265,7 @@ ID = c- + SHA256("name\taddr")[:8]
 Example: c-a3f8b2e1
 ```
 
-- Of 3,107 records, `(name, addr)` is unique for 3,105 (2 are true duplicates in the PDF data, removed during parsing)
+- Of 3,107 raw PDF records, `(name, addr)` is unique for 3,105 (2 are true duplicates in the PDF data, removed during parsing)
 - 8 hex chars (32 bits) has effectively zero collision probability. Falls back to 12 chars on collision
 - Completely deterministic — independent of ordering or prefecture download success
 
