@@ -19,7 +19,7 @@ Each time a new rule was added, cases were discovered where it interfered with e
 - Out of 9,951 records (non-empty hours), there are approximately 6,933 unique formats
 - `normalizeHoursText` alone has 75 `.replace()` calls (~156 lines)
 - The entire parser (normalization through rendering) is ~590 lines with ~150 regex patterns
-- The result: 97.1% coverage (9,659 records parseable; the remaining 2.9% are natural language, URLs, or bad data)
+- The result: pharmacy 98.2% coverage (9,768 parseable), clinic 88.3% coverage (2,739 parseable). Remaining failures are natural language, URLs, or bad data
 
 ## Architecture Overview
 

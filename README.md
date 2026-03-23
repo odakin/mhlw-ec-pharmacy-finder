@@ -141,7 +141,7 @@ python3 scripts/geocode.py --force      # 全件再取得
 
 - **[設計思想](https://odakin.github.io/mhlw-ec-pharmacy-finder/DESIGN.html)** — なぜこの実装になっているか。フィルター設計原則（3軸評価）、薬局/医療機関の表示方式、位置情報UX、営業時間パーサーの哲学、技術選定の原則
 - **[機能仕様書](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC.html)** — 4機能の要件・技術選定の理由（なぜ東大CSISか、なぜNominatimは不採用か等）
-- **[営業時間パーサー設計](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER.html)** — 6,933種のフォーマット揺れを97.1%パースする多段正規化パイプラインの設計と、各判断の背景
+- **[営業時間パーサー設計](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER.html)** — 多段正規化パイプラインの設計と各判断の背景（薬局 98.2% / 医療機関 88.3% カバー率）
 
 ---
 
@@ -194,7 +194,7 @@ Design documents recording the reasoning behind implementation decisions:
 
 - **[Design Philosophy](https://odakin.github.io/mhlw-ec-pharmacy-finder/DESIGN_EN.html)** — Why the site is built the way it is: filter design principles (3-axis evaluation), pharmacy/clinic display strategy, location privacy UX, hours parser philosophy, and technology choices
 - **[Feature Specification](https://odakin.github.io/mhlw-ec-pharmacy-finder/FEATURE_SPEC_EN.html)** — Requirements and technical choices for all 4 features
-- **[Business Hours Parser Design](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER_EN.html)** — How the multi-stage normalization pipeline parses 6,933 format variations at 97.1% coverage
+- **[Business Hours Parser Design](https://odakin.github.io/mhlw-ec-pharmacy-finder/HOURS_PARSER_EN.html)** — Multi-stage normalization pipeline design (pharmacy 98.2% / clinic 88.3% coverage)
 
 ## License
 - Code: MIT License

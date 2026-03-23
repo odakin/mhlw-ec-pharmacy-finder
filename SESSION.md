@@ -13,7 +13,7 @@
 
 ## 現在の状態（2026-03-23）
 
-**全機能実装済み・運用中。** 未完了の開発タスクなし。
+**全機能実装済み・運用中。**
 
 ### データ
 
@@ -92,4 +92,4 @@
 ## 残タスク
 
 - [ ] 全機能のライブサイトテスト（近い順は位置情報が必要）
-- [ ] clinics.json 再生成（update_clinics.py の obgyn/stock 正規化を反映するため `--local-dir` で実行）
+- [ ] clinics.json 再生成（update_clinics.py の obgyn/stock 正規化を反映。次回の GitHub Actions 日次実行で自動適用、または `--local-dir` で手動実行）

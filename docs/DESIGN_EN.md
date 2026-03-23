@@ -48,7 +48,7 @@ The medical institution data includes a "stock availability" (常時在庫の有
 
 This seems useful at first glance, but is intentionally not implemented.
 
-- **Source**: Estimated by the hours parser (secondary processing). Coverage is 97.1%, meaning approximately 290 facilities cannot have their operating status determined
+- **Source**: Estimated by the hours parser (secondary processing). Coverage is 98.2% for pharmacies and 88.3% for clinics; unparseable facilities cannot have their operating status determined
 - **Alternatives**: The nearest pharmacy might be one of those unparseable entries — no alternative exists
 - **Harm of not excluding**: None. The current design of displaying business hours on each card is sufficient
 

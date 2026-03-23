@@ -66,7 +66,7 @@ This document specifies features to be added to the emergency contraceptive pill
 
 ---
 
-## Feature 3: Business Hours Display -- Implemented (commits 3c3c685-04853e7, parser coverage 97.1%)
+## Feature 3: Business Hours Display -- Implemented (parser coverage: pharmacy 98.2% / clinic 88.3%)
 
 ### Challenges
 - The `hours` field has 6,933 distinct format variations
@@ -92,12 +92,12 @@ This document specifies features to be added to the emergency contraceptive pill
 1. ~~**Feature 4** (Google Maps Link)~~ -- Done (d83b795)
 2. ~~**Feature 1** (Map View)~~ -- Done (514ad56, 3c3c685)
 3. ~~**Feature 2** (Sort by Proximity)~~ -- Done (3c3c685)
-4. ~~**Feature 3** (Business Hours Display)~~ -- Done (3c3c685-04853e7, 97.1% coverage)
+4. ~~**Feature 3** (Business Hours Display)~~ -- Done (pharmacy 98.2% / clinic 88.3% coverage)
 
 ## Data Structure (Investigated)
 
 - **Latitude/longitude: Not present** -- Geocoded via University of Tokyo CSIS (house-number-level accuracy, free)
-- **Business hours: Present** -- `hours` field. 6,933 format variations. 97.1% parseable (see [HOURS_PARSER](HOURS_PARSER_EN.html))
+- **Business hours: Present** -- `hours` field. Pharmacy 98.2% / clinic 88.3% parseable (see [HOURS_PARSER](HOURS_PARSER_EN.html))
 - **Data loading**: Fetches `docs/data.json`. 10,128 entries
 - **Coordinate data loading**: Fetches `docs/geocode_cache.json` only when map is displayed (separate file to keep initial load light)
 - **Public directory**: `docs/` (GitHub Pages)
