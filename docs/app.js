@@ -784,7 +784,7 @@ function getHoursInfo(raw, ctx, cachedParse) {
   };
 }
 
-function renderHoursHtml(raw, info) {
+function renderHoursHtml(raw, info, afterHoursFlag) {
   if (!info) info = getHoursInfo(raw);
   if (!info.parsed) {
     // Fallback: show unknown badge + raw data
@@ -802,15 +802,16 @@ function renderHoursHtml(raw, info) {
   if (todayRanges.length) {
     const badgeText = isOpen
       ? (todayUsingHoliday ? "営業中（祝日時間）" : "営業中")
-      : "営業時間外";
-    const badge = isOpen
-      ? `<span class="badge open">${badgeText}</span>`
-      : `<span class="badge closed">${badgeText}</span>`;
+      : (afterHoursFlag ? "時間外対応可" : "営業時間外");
+    const badgeClass = isOpen ? "open" : (afterHoursFlag ? "after-hours" : "closed");
+    const badge = `<span class="badge ${badgeClass}">${badgeText}</span>`;
     const times = todayRanges.map((r) => `${r.open}-${r.close}`).join(", ");
     todayHtml = `<div class="hours-today">${badge} <strong>${todayName}曜${holidayLabel}</strong> ${times}</div>`;
   } else {
     const closedText = todayUsingHoliday ? "本日休み（祝日）" : "本日休み";
-    todayHtml = `<div class="hours-today"><span class="badge closed">${closedText}</span></div>`;
+    const closedClass = afterHoursFlag ? "after-hours" : "closed";
+    const closedBadge = afterHoursFlag ? "時間外対応可" : closedText;
+    todayHtml = `<div class="hours-today"><span class="badge ${closedClass}">${closedBadge}</span></div>`;
   }
 
   // Full schedule (collapsible) — Monday-first order
@@ -1164,7 +1165,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
     if (isClinic) {
       // Clinic card — renderHoursHtml handles both parsed and unparseable (with unknown badge)
       const clinicHoursInfo = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
-      const clinicHoursHtml = renderHoursHtml(r.hours, clinicHoursInfo);
+      const clinicHoursHtml = renderHoursHtml(r.hours, clinicHoursInfo, false);
       li.innerHTML = `
         <div class="card clinic-card">
           <div class="cardHead">
@@ -1201,7 +1202,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
 
       // Hours (Feature 3)
       const hoursInfo = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
-      const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
+      const hoursHtml = renderHoursHtml(r.hours, hoursInfo, afterHoursFlag);
       const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
       const afterHoursNote = (isClosed && afterHoursFlag)
         ? `<div class="after-hours-note">🌙 時間外対応あり${showAfterTel ? ` — 📞 ${afterTelLink}` : (tel ? ` — 📞 ${telLink}` : ``)}</div>`
@@ -1266,7 +1267,6 @@ function syncUrlFromState() {
   if (el("hasFemale").checked) params.set("female", "1");
   if (el("hasPrivateRoom").checked) params.set("room", "1");
   if (el("onlyNotCallAhead").checked) params.set("nocall", "1");
-  if (el("onlyAfterHours").checked) params.set("after", "1");
   if (el("nowOpen").checked) params.set("open", "1");
   if (el("showClinics").checked) params.set("clinic", "1");
   const qs = params.toString();
@@ -1287,7 +1287,6 @@ function restoreStateFromUrl() {
   el("hasFemale").checked = params.get("female") === "1";
   el("hasPrivateRoom").checked = params.get("room") === "1";
   el("onlyNotCallAhead").checked = params.get("nocall") === "1";
-  el("onlyAfterHours").checked = params.get("after") === "1";
   el("nowOpen").checked = params.get("open") === "1";
   el("showClinics").checked = params.get("clinic") === "1";
 }
@@ -1314,7 +1313,6 @@ function doSearch(resetLimit = true) {
   const pref = cleanValue(el("prefSelect").value);
   const q = normalizeText(el("q").value);
   const onlyNotCallAhead = el("onlyNotCallAhead").checked;
-  const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
   const hasPrivateRoom = el("hasPrivateRoom").checked;
   const nowOpen = el("nowOpen").checked;
@@ -1329,12 +1327,12 @@ function doSearch(resetLimit = true) {
   const pharmacyRows = DATA.filter((r) => {
     if (pref && r.pref !== pref) return false;
     if (onlyNotCallAhead && (r.callAhead || "") === "要") return false;
-    if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
     if (hasFemale && !(toInt(r.pharmacistsFemale) > 0)) return false;
     if (hasPrivateRoom && !(r.privacy || "").includes("個室")) return false;
     if (nowOpen) {
       const info = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
-      if (info.parsed && !info.isOpen) return false;
+      // Hide only confirmed-closed without after-hours service
+      if (info.parsed && !info.isOpen && (r.afterHours || "") !== "有") return false;
     }
     if (!terms.length) return true;
     return terms.every((t) => r._blob.includes(t));
@@ -1492,9 +1490,9 @@ document.addEventListener("DOMContentLoaded", () => {
     el("q").value = "";
     el("prefSelect").value = "";
     el("onlyNotCallAhead").checked = false;
-    el("onlyAfterHours").checked = false;
     el("hasFemale").checked = false;
     el("hasPrivateRoom").checked = false;
+    el("nowOpen").checked = false;
     el("showClinics").checked = false;
     SORT_BY_DIST = false;
     USER_POS = null;
@@ -1505,7 +1503,6 @@ document.addEventListener("DOMContentLoaded", () => {
   el("q").addEventListener("keydown", (ev) => { if (ev.key === "Enter") doSearch(true); });
   el("prefSelect").addEventListener("change", () => doSearch(true));
   el("onlyNotCallAhead").addEventListener("change", () => doSearch(true));
-  el("onlyAfterHours").addEventListener("change", () => doSearch(true));
   el("hasFemale").addEventListener("change", () => doSearch(true));
   el("hasPrivateRoom").addEventListener("change", () => doSearch(true));
   el("nowOpen").addEventListener("change", () => doSearch(true));
