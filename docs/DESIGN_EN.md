@@ -44,15 +44,15 @@ The medical institution data includes a "stock availability" (常時在庫の有
 
 > Primary source + alternatives available + practical benefit of noise removal. Exclusion is justified.
 
-#### Example: "Currently Open" filter → Not implemented
+#### Example: "Currently Available" filter → ~~Not implemented~~ Implemented as user-initiated filter
 
-This seems useful at first glance, but is intentionally not implemented.
+Initially decided against implementation. However, parser improvements (pharmacy 98.2%, clinic 88.3%) and the "unknown badge" design changed the 3-axis evaluation:
 
-- **Source**: Estimated by the hours parser (secondary processing). Coverage is 98.2% for pharmacies and 88.3% for clinics; unparseable facilities cannot have their operating status determined
-- **Alternatives**: The nearest pharmacy might be one of those unparseable entries — no alternative exists
-- **Harm of not excluding**: None. The current design of displaying business hours on each card is sufficient
+- **Source**: Parser estimation (secondary), but time determination is accurate for successfully parsed records. The filter only hides "parsed AND outside hours AND no after-hours service"
+- **Alternatives**: Unparseable facilities shown with "Status Unknown" badge. After-hours pharmacies shown with "After-Hours Available" badge. No facilities silently removed
+- **Harm of not excluding**: At 10pm in Tokyo, 40 of 50 results are "Outside Hours". Scrolling on mobile to find 10 open ones is real friction in an emergency
 
-> Secondary processing creates a risk of inadvertently hiding useful options as collateral damage, and there is no harm in not excluding. The conditions differ from the stock filter on all three axes.
+> Hides only "confirmed closed (no after-hours)" facilities. Uncertain records (unparseable) and after-hours pharmacies remain visible. Default OFF (user-initiated). The former "After-Hours Available" checkbox was merged into this filter. Badge system: green (Open) / blue (After-Hours Available) / gray (Closed) / amber (Status Unknown). See [NOW_OPEN_FILTER.md](../NOW_OPEN_FILTER.md) for full design rationale.
 
 ### User-Initiated Filters (User Turns Them ON)
 
