@@ -1119,7 +1119,6 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
             <span>📍 ${gmapLink}</span>
           </div>
           ${r.hours ? `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(r.hours)}</div>` : ``}
-          <div class="clinic-rx-note">※医師の対面診察・処方箋が必要です</div>
         </div>
       `;
     } else {
