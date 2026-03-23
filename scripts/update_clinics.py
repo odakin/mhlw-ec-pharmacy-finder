@@ -11,12 +11,14 @@ Usage:
   python3 scripts/update_clinics.py              # download all + generate
   python3 scripts/update_clinics.py --pref 東京都  # single prefecture (debug)
   python3 scripts/update_clinics.py --local-dir data/clinics  # use cached PDFs
+  python3 scripts/update_clinics.py --force-write # skip partial-failure safety check
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import re
 import time
@@ -47,6 +49,23 @@ PREFECTURES = [
     "徳島県", "香川県", "愛媛県", "高知県",
     "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ]
+
+# Minimum fraction of previous record count to accept (partial-failure guard)
+_MIN_COUNT_RATIO = 0.80
+
+
+# ── Stable ID ───────────────────────────────────────────────────────
+
+def _clinic_id(name: str, addr: str) -> str:
+    """Deterministic clinic ID from name + address.
+
+    Returns 'c-' followed by the first 8 hex chars of SHA-256(name \\t addr).
+    This ID is stable across reorderings and partial failures — it only
+    changes if the clinic's name or address changes.
+    """
+    key = f"{name}\t{addr}"
+    h = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
+    return f"c-{h}"
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -268,6 +287,102 @@ def parse_pdf(pdf_path: Path, pref: str) -> list[dict]:
     return records
 
 
+# ── Geocache Migration ──────────────────────────────────────────────
+
+def _migrate_geocache(repo_root: Path, old_clinics: list[dict]) -> int:
+    """One-time migration: rewrite geocode_cache keys from positional (c1)
+    to stable hash-based (c-XXXXXXXX) IDs.
+
+    Returns the number of keys migrated.
+    """
+    cache_paths = [
+        repo_root / "data" / "geocode_cache.json",
+        repo_root / "docs" / "geocode_cache.json",
+    ]
+
+    # Check if migration is needed (any c-prefix key matches old format)
+    master = cache_paths[0]
+    if not master.exists():
+        return 0
+    cache = json.loads(master.read_text(encoding="utf-8"))
+    old_keys = [k for k in cache if re.match(r"^c\d+$", k)]
+    if not old_keys:
+        return 0  # Already migrated or no clinic entries
+
+    # Build mapping: old_id -> new_id
+    migrated = 0
+    for rec in old_clinics:
+        old_id = rec.get("id", "")
+        if not re.match(r"^c\d+$", old_id):
+            continue
+        new_id = _clinic_id(rec["name"], rec["addr"])
+        if old_id in cache:
+            cache[new_id] = cache.pop(old_id)
+            migrated += 1
+
+    if migrated:
+        out = json.dumps(cache, ensure_ascii=False, separators=(",", ":"))
+        for p in cache_paths:
+            if p.exists() or p == master:
+                p.write_text(out, encoding="utf-8")
+        print(f"  Geocache migration: {migrated} keys rewritten (c1→c-XXXXXXXX)")
+
+    return migrated
+
+
+# ── Partial-Failure Safety ──────────────────────────────────────────
+
+def _load_previous(docs_dir: Path) -> tuple[int, set[str]]:
+    """Load previous clinics.json for safety comparison.
+
+    Returns (record_count, set_of_prefectures).
+    """
+    prev_path = docs_dir / "clinics.json"
+    if not prev_path.exists():
+        return 0, set()
+    try:
+        prev = json.loads(prev_path.read_text(encoding="utf-8"))
+        records = prev.get("data", [])
+        prefs = {r.get("pref", "") for r in records if isinstance(r, dict)}
+        prefs.discard("")
+        return len(records), prefs
+    except Exception:
+        return 0, set()
+
+
+def _check_safety(
+    new_count: int,
+    new_prefs: set[str],
+    prev_count: int,
+    prev_prefs: set[str],
+) -> str | None:
+    """Return an error message if the new data looks like a partial failure.
+
+    Returns None if the data passes all checks.
+    """
+    if prev_count == 0:
+        return None  # No previous data to compare against
+
+    # Check 1: prefecture coverage — any previously present pref must still exist
+    missing = prev_prefs - new_prefs
+    if missing:
+        return (
+            f"Prefecture coverage check failed: {len(missing)} previously present "
+            f"prefecture(s) missing: {', '.join(sorted(missing))}. "
+            f"Previous: {len(prev_prefs)} prefs, New: {len(new_prefs)} prefs."
+        )
+
+    # Check 2: global count threshold
+    if new_count < prev_count * _MIN_COUNT_RATIO:
+        return (
+            f"Record count dropped below {_MIN_COUNT_RATIO:.0%} threshold: "
+            f"{new_count} vs previous {prev_count} "
+            f"({new_count / prev_count:.1%})."
+        )
+
+    return None
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 def write_json(path: Path, obj) -> None:
@@ -287,9 +402,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pref", default=None, help="Process single prefecture (e.g. 東京都)")
     parser.add_argument("--local-dir", type=Path, default=None, help="Use cached PDFs from this directory")
     parser.add_argument("--as-of", default=None, help="Override as-of date (YYYY-MM-DD)")
+    parser.add_argument("--force-write", action="store_true", help="Skip partial-failure safety check")
     args = parser.parse_args(argv)
 
+    is_full_run = args.pref is None
     as_of = args.as_of or datetime.date.today().isoformat()
+
+    # Load previous data for safety comparison and migration
+    prev_count, prev_prefs = _load_previous(docs_dir)
+    old_clinics_data: list[dict] = []
+    if is_full_run:
+        prev_path = docs_dir / "clinics.json"
+        if prev_path.exists():
+            try:
+                old_clinics_data = json.loads(
+                    prev_path.read_text(encoding="utf-8")
+                ).get("data", [])
+            except Exception:
+                pass
 
     # Determine which prefectures to process
     target_prefs = [args.pref] if args.pref else PREFECTURES
@@ -355,11 +485,55 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             errors.append(f"{pref}: parse failed: {e}")
 
-    # Assign IDs with "c" prefix
-    for i, rec in enumerate(all_records, start=1):
-        rec["id"] = f"c{i}"
+    # ── Deduplicate by (name, addr) ─────────────────────────────────
+    seen: dict[tuple[str, str], int] = {}
+    unique_records: list[dict] = []
+    dupes = 0
+    for rec in all_records:
+        key = (rec["name"], rec["addr"])
+        if key in seen:
+            dupes += 1
+            print(f"  WARNING: duplicate record skipped: {rec['name']} / {rec['addr']}")
+            continue
+        seen[key] = len(unique_records)
+        unique_records.append(rec)
+    if dupes:
+        print(f"  Deduplicated: {dupes} duplicate(s) removed")
+    all_records = unique_records
 
-    # Build clinics.json
+    # ── Assign stable IDs ───────────────────────────────────────────
+    id_set: set[str] = set()
+    for rec in all_records:
+        cid = _clinic_id(rec["name"], rec["addr"])
+        # Collision fallback: extend hash length
+        if cid in id_set:
+            key = f"{rec['name']}\t{rec['addr']}"
+            cid = "c-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+        id_set.add(cid)
+        rec["id"] = cid
+
+    # Sort deterministically for stable diffs
+    all_records.sort(key=lambda r: (r.get("pref", ""), r.get("muni", ""), r.get("name", "")))
+
+    # ── Partial-failure safety check (full runs only) ───────────────
+    if is_full_run and not args.force_write:
+        new_prefs = {r["pref"] for r in all_records if r.get("pref")}
+        err = _check_safety(len(all_records), new_prefs, prev_count, prev_prefs)
+        if err:
+            print(f"\n⚠️  SAFETY CHECK FAILED — clinics.json NOT updated.")
+            print(f"   {err}")
+            print(f"   Use --force-write to override.")
+            if errors:
+                print(f"\n   Download/parse errors ({len(errors)}):")
+                for e in errors:
+                    print(f"     - {e}")
+            return 0  # exit 0 so workflow continues (pharmacies, geocoding)
+
+    # ── Migrate geocache if needed (full runs only, before writing) ─
+    if is_full_run and old_clinics_data:
+        _migrate_geocache(repo_root, old_clinics_data)
+
+    # ── Write output ────────────────────────────────────────────────
     payload = {
         "meta": {
             "asOf": as_of,
