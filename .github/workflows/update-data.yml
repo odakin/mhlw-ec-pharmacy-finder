@@ -69,7 +69,17 @@ jobs:
           }
           const ok = j.data.some(x => x && typeof x === 'object' && x.pref && x.name && x.addr);
           if (!ok) throw new Error('records exist but look empty (pref/name/addr missing)');
-          console.log('shape+content OK');
+          // Ensure empty-record exclusion and two-layer count are intact (DESIGN.md §3, §8)
+          if (typeof j.meta.totalPublished !== 'number' || j.meta.totalPublished < j.data.length) {
+            throw new Error(`meta.totalPublished missing or invalid: ${j.meta.totalPublished}`);
+          }
+          if (typeof j.meta.scriptHash !== 'string' || j.meta.scriptHash.length === 0) {
+            throw new Error('meta.scriptHash missing — cache may be stale');
+          }
+          if (j.data.some(x => x && typeof x === 'object' && !x.addr)) {
+            throw new Error('data.json contains records with empty addr (empty-record exclusion failed)');
+          }
+          console.log(`shape+content OK (${j.data.length} records, totalPublished=${j.meta.totalPublished})`);
           NODE
 
       - name: Validate docs/clinics.json (strict JSON)
