@@ -15,7 +15,7 @@ const PENDING_PREFS = new Set();
 const el = (id) => document.getElementById(id);
 
 // UI rendering limit (keeps the DOM light).
-const RESULTS_STEP = 50;
+const RESULTS_STEP = 20;
 let CURRENT_ROWS = [];
 let CURRENT_LIMIT = RESULTS_STEP;
 
