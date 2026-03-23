@@ -1188,7 +1188,6 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
     } else {
       // Pharmacy card (existing)
       const privacy = escapeHtml(r.privacy || "");
-      const notes = escapeHtml(r.notes || "");
       const callAhead = (r.callAhead || "") === "要";
       const afterHoursFlag = (r.afterHours || "") === "有";
       const afterTel = (r.afterHoursTel || "").toString();
@@ -1229,7 +1228,6 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
           ${afterHoursNote}
           ${hasPharmacists ? `<div class="detail"><span class="k">販売可能薬剤師（性別・人数）</span> 女性${pf} / 男性${pm} / 答えたくない${pn}</div>` : ``}
           ${privacy ? `<div class="detail"><span class="k">プライバシー</span> ${privacy}</div>` : ``}
-          ${notes ? `<div class="detail"><span class="k">備考</span> ${notes}</div>` : ``}
         </div>
       `;
     }
@@ -1436,7 +1434,7 @@ async function init() {
     const real = [];
     for (const r of json.data || []) {
       const rr = { ...r };
-      for (const k of ["pref","muni","name","addr","tel","url","hours","privacy","callAhead","afterHours","afterHoursTel","notes"]) {
+      for (const k of ["pref","muni","name","addr","tel","url","hours","privacy","callAhead","afterHours","afterHoursTel"]) {
         if (k in rr) rr[k] = cleanValue(rr[k]);
       }
       rr.pharmacistsFemale = toInt(rr.pharmacistsFemale);
