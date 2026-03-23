@@ -83,6 +83,7 @@ async function loadClinics() {
       if (!st.startsWith("有") && st !== "あり") continue;
       rr._isClinic = true;
       rr._blob = buildSearchBlob(rr);
+      rr._hoursParsed = parseHours(normalizeHoursText(rr.hours || ""));
       recs.push(rr);
     }
     CLINICS = recs;
@@ -695,10 +696,11 @@ function getJstContext() {
   return { todayDow, nowMin, isHoliday, yesterdayIsHoliday };
 }
 
-function getHoursInfo(raw, ctx) {
+function getHoursInfo(raw, ctx, cachedParse) {
   // Returns { todayRanges, isOpen, parsed, allDays, todayDow, isHoliday, holidaySchedule, holidayClosed }
   // ctx: optional pre-computed JST context from getJstContext()
-  const parsed = parseHours(raw);
+  // cachedParse: optional pre-computed parseHours() result (for performance)
+  const parsed = cachedParse !== undefined ? cachedParse : parseHours(raw);
   if (!parsed) return { parsed: false };
 
   if (!ctx) ctx = getJstContext();
@@ -785,8 +787,10 @@ function getHoursInfo(raw, ctx) {
 function renderHoursHtml(raw, info) {
   if (!info) info = getHoursInfo(raw);
   if (!info.parsed) {
-    // Fallback: show raw data
-    return raw ? `<div class="detail"><span class="k">開局等時間</span> ${escapeHtml(raw)}</div>` : "";
+    // Fallback: show unknown badge + raw data
+    if (!raw) return "";
+    return `<div class="hours-today"><span class="badge unknown">営業状況不明</span></div>`
+      + `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(raw)}</div>`;
   }
 
   const { todayRanges, isOpen, allDays, todayDow, isHoliday, todayUsingHoliday, holidayRanges, holidayClosed } = info;
@@ -1158,11 +1162,9 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
       : "";
 
     if (isClinic) {
-      // Clinic card — use parsed hours if available, raw text fallback
-      const clinicHoursInfo = r.hours ? getHoursInfo(r.hours, jstCtx) : null;
-      const clinicHoursHtml = (clinicHoursInfo && clinicHoursInfo.parsed)
-        ? renderHoursHtml(r.hours, clinicHoursInfo)
-        : (r.hours ? `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(r.hours)}</div>` : ``);
+      // Clinic card — renderHoursHtml handles both parsed and unparseable (with unknown badge)
+      const clinicHoursInfo = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
+      const clinicHoursHtml = renderHoursHtml(r.hours, clinicHoursInfo);
       li.innerHTML = `
         <div class="card clinic-card">
           <div class="cardHead">
@@ -1198,7 +1200,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
       const hasPharmacists = (pf + pm + pn) > 0;
 
       // Hours (Feature 3)
-      const hoursInfo = getHoursInfo(r.hours, jstCtx);
+      const hoursInfo = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
       const hoursHtml = renderHoursHtml(r.hours, hoursInfo);
       const isClosed = hoursInfo.parsed && !hoursInfo.isOpen;
       const afterHoursNote = (isClosed && afterHoursFlag)
@@ -1265,6 +1267,7 @@ function syncUrlFromState() {
   if (el("hasPrivateRoom").checked) params.set("room", "1");
   if (el("onlyNotCallAhead").checked) params.set("nocall", "1");
   if (el("onlyAfterHours").checked) params.set("after", "1");
+  if (el("nowOpen").checked) params.set("open", "1");
   if (el("showClinics").checked) params.set("clinic", "1");
   const qs = params.toString();
   const url = qs ? "?" + qs : location.pathname;
@@ -1285,6 +1288,7 @@ function restoreStateFromUrl() {
   el("hasPrivateRoom").checked = params.get("room") === "1";
   el("onlyNotCallAhead").checked = params.get("nocall") === "1";
   el("onlyAfterHours").checked = params.get("after") === "1";
+  el("nowOpen").checked = params.get("open") === "1";
   el("showClinics").checked = params.get("clinic") === "1";
 }
 
@@ -1313,9 +1317,13 @@ function doSearch(resetLimit = true) {
   const onlyAfterHours = el("onlyAfterHours").checked;
   const hasFemale = el("hasFemale").checked;
   const hasPrivateRoom = el("hasPrivateRoom").checked;
+  const nowOpen = el("nowOpen").checked;
   const showClinics = el("showClinics").checked;
   const terms = q ? q.split(" ").filter(Boolean) : [];
   syncUrlFromState();
+
+  // Pre-compute JST context once (needed for nowOpen filter + rendering)
+  const jstCtx = nowOpen ? getJstContext() : null;
 
   // Filter pharmacies
   const pharmacyRows = DATA.filter((r) => {
@@ -1324,6 +1332,10 @@ function doSearch(resetLimit = true) {
     if (onlyAfterHours && (r.afterHours || "") !== "有") return false;
     if (hasFemale && !(toInt(r.pharmacistsFemale) > 0)) return false;
     if (hasPrivateRoom && !(r.privacy || "").includes("個室")) return false;
+    if (nowOpen) {
+      const info = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
+      if (info.parsed && !info.isOpen) return false;
+    }
     if (!terms.length) return true;
     return terms.every((t) => r._blob.includes(t));
   });
@@ -1333,7 +1345,10 @@ function doSearch(resetLimit = true) {
   if (showClinics && CLINICS_LOADED) {
     clinicRows = CLINICS.filter((r) => {
       if (pref && r.pref !== pref) return false;
-      // Pharmacy-specific filters don't apply to clinics
+      if (nowOpen) {
+        const info = getHoursInfo(r.hours, jstCtx, r._hoursParsed);
+        if (info.parsed && !info.isOpen) return false;
+      }
       if (!terms.length) return true;
       return terms.every((t) => r._blob.includes(t));
     });
@@ -1438,6 +1453,7 @@ async function init() {
       // Skip records with no address (consolidated/defunct — no usable info)
       if (!rr.addr) continue;
       rr._blob = buildSearchBlob(rr);
+      rr._hoursParsed = parseHours(normalizeHoursText(rr.hours || ""));
       real.push(rr);
     }
     DATA = real;
@@ -1492,6 +1508,7 @@ document.addEventListener("DOMContentLoaded", () => {
   el("onlyAfterHours").addEventListener("change", () => doSearch(true));
   el("hasFemale").addEventListener("change", () => doSearch(true));
   el("hasPrivateRoom").addEventListener("change", () => doSearch(true));
+  el("nowOpen").addEventListener("change", () => doSearch(true));
   el("showClinics").addEventListener("change", async () => {
     if (el("showClinics").checked && !CLINICS_LOADED) {
       await loadClinics();
