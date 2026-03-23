@@ -211,6 +211,25 @@ function normalizeHoursText(raw) {
     .replace(/．/g, ".")
     .replace(/\s+/g, " ")
     .trim();
+  // AM/PM → 24h conversion (PM3:30 → 15:30, AM9:00 → 9:00)
+  s = s.replace(/PM\s*(\d{1,2})/gi, (_, h) => {
+    const hr = parseInt(h);
+    return String(hr < 12 ? hr + 12 : hr);
+  });
+  s = s.replace(/AM\s*(\d{1,2})/gi, "$1");
+  // 午前/午後 → strip or convert (午後3:30 → 15:30, 午前9:00 → 9:00)
+  // Only when followed by a digit (avoid matching 午前診, 午後休診)
+  s = s.replace(/午後\s*(\d{1,2})/g, (_, h) => {
+    const hr = parseInt(h);
+    return String(hr < 12 ? hr + 12 : hr);
+  });
+  s = s.replace(/午前\s*(\d{1,2})/g, "$1");
+  // Strip parens around day lists early: (月・火・水) 9:00 → 月・火・水 9:00
+  // Must run before day:time normalization. Only matches parens containing day chars.
+  s = s.replace(/[（(]([月火水木金土日祝・,\-~]+)[）)]/g, "$1");
+  // Strip common prefixes that appear before day:time specs
+  s = s.replace(/^受付[時間]*\s*/g, "");
+  s = s.replace(/毎週\s*/g, "");
   // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00)
   s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2}:\d{2})/g, "$1-$2");
   // Normalize ~ to - in day ranges (月~金 -> 月-金)
@@ -219,14 +238,20 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日])曜(?:日(?!曜))?/g, "$1");
   // After 曜日 strip, insert ・ when range end abuts a bare day (月-金日 -> 月-金・日)
   s = s.replace(/([月火水木金土日])([-~])([月火水木金土日])([月火水木金土日])/g, "$1$2$3・$4");
-  // 年中無休 / 全日 -> all days marker
+  // 年中無休 / 全日 / 常時 -> all days marker
   s = s.replace(/年中無休/g, "毎日");
   s = s.replace(/全日/g, "毎日");
+  s = s.replace(/^常時.*$/, "毎日");
+  s = s.replace(/^年中$/, "毎日");
   s = s.replace(/平日/g, "月-金");
   // 祝日 -> 祝
   s = s.replace(/祝日/g, "祝");
-  // 24時間 -> all day marker
-  s = s.replace(/24時間/g, "毎日:0:00-24:00");
+  // Re-run paren strip after 平日→月-金, 全日→毎日 conversion
+  s = s.replace(/[（(]([月火水木金土日祝・,\-~]+)[）)]/g, "$1");
+  // Strip empty parens left over from combined normalizations (e.g. (祝を除く)→()→"")
+  s = s.replace(/[（(][）)]/g, "");
+  // 24時間 -> all day marker (strip trailing text like 可, 対応 etc.)
+  s = s.replace(/24時間.*$/g, "毎日:0:00-24:00");
   // Insert : between day spec and time when missing (月-土9:00 -> 月-土:9:00)
   // Also handle space separator: "月-金 9:00" -> "月-金:9:00"
   s = s.replace(/([月火水木金土日祝])\s+(\d{1,2}:\d{2})/g, "$1:$2");
@@ -258,11 +283,13 @@ function normalizeHoursText(raw) {
   s = s.replace(/(\d{1,2}:\d{2})\s*[）)]/g, "$1");
   // Normalize お休み -> 休み (must run BEFORE 休み strip patterns)
   s = s.replace(/お休み/g, "休み");
-  // Strip trailing 休み/定休/休 suffixes (日・祝休み, 日祝休み, 土日祝:休み, etc.)
-  s = s.replace(/[,、]\s*[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
-  s = s.replace(/[月火水木金土日祝・,]+\s*[:]\s*休み?$/g, "");
-  s = s.replace(/[月火水木金土日祝・,]+休み$/g, "");
+  // Strip trailing 休み/休診/定休/休 suffixes (日・祝休み, 日祝休み, 土日祝:休み, 火・土午後休診 etc.)
+  s = s.replace(/[,、]\s*[月火水木金土日祝・,]+\s*[:]\s*(?:休み?|休診)$/g, "");
+  s = s.replace(/[月火水木金土日祝・,]+\s*[:]\s*(?:休み?|休診)$/g, "");
+  s = s.replace(/[月火水木金土日祝・,]+(?:午後)?(?:休み|休診)$/g, "");
   s = s.replace(/定休[日:].*$/g, "");
+  // Strip trailing 対応不可 suffixes (土日祝対応不可 etc.)
+  s = s.replace(/[月火水木金土日祝・,]+対応不可$/g, "");
   // Strip "休:祝" / "休:日祝" type suffixes
   s = s.replace(/[,]\s*休\s*[:]\s*[月火水木金土日祝・,]+$/g, "");
   // Strip trailing 365日 suffix
@@ -284,9 +311,9 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日祝])[;；]/g, "$1:");
   // Normalize ｡ to , (segment separator)
   s = s.replace(/｡/g, ",");
-  // "祝を除く" / "祝除く" — keep marker for holidayClosed detection, then strip
-  // (Detection happens in parseHours before this text is consumed)
-  s = s.replace(/祝を?除く/g, "");
+  // "X曜を除く" / "祝を除く" — strip day-exclusion markers
+  // (holidayClosed detection happens in parseHours on raw text before normalization)
+  s = s.replace(/[月火水木金土日祝]+を?除く/g, "");
   // Normalize 漢数字 in ordinal day specs (第一土 -> 第1土, 第二 -> 第2, etc.)
   // Also handle comma-preceded: ,四日 -> ,4日
   s = s.replace(/([第・,])([一二三四五])/g, (_, p, k) => p + ("一二三四五".indexOf(k) + 1));
@@ -528,7 +555,11 @@ function parseHours(raw) {
     if (sched.length) return { schedule: sched, holidaySchedule: [], holidayClosed };
   }
 
-  // Handle "毎日:9:00-20:00" pattern
+  // Handle "毎日:9:00-20:00" pattern (also bare "毎日" = 24h)
+  if (/^毎日\s*$/.test(text)) {
+    const allDays = [0, 1, 2, 3, 4, 5, 6];
+    return { schedule: [{ days: allDays, open: "0:00", close: "24:00" }], holidaySchedule: [], holidayClosed };
+  }
   const everyDayMatch = text.match(/^毎日\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
   if (everyDayMatch) {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
@@ -556,12 +587,21 @@ function parseHours(raw) {
       seg = seg.replace(/([月火水木金土日])(\d{1,2}:\d{2})/g, "$1:$2");
     }
 
-    // Skip closed-day segments without colon (日祝 休み, 日祝休業, etc.)
-    if (/^[月火水木金土日祝・,\s]+(休み?|閉局|定休|休業)\s*$/.test(seg)) continue;
+    // Skip closed-day/note segments (日祝 休み, 日祝休業, 土午後, etc.)
+    if (/^[月火水木金土日祝・,\s]+(休み?|閉局|定休|休業|休診|午後)\s*$/.test(seg)) continue;
+    // Skip free-text labels (外来診療時間内, 診察時間内, なし, etc.)
+    if (/^(外来|診[療察]|受付|なし|不定|随時)/.test(seg)) continue;
 
     // Pattern: daySpec:timeRange(s)
     const m = seg.match(/^([月火水木金土日祝毎第\d][月火水木金土日祝毎第\d\-~・,]*)\s*[:]\s*(.+)$/);
-    if (!m) return null; // can't parse -> give up on entire string
+    if (!m) {
+      // If segment looks like a note/comment rather than a day:time spec, skip it
+      // gracefully instead of failing the entire string. Common in clinic data.
+      if (/[除休不]|対応|要|予約|限|可能|時間外|時間内|緊急|指定|のみ$|GW|お盆|年末|祭|及び|以外|診$|診察/.test(seg)) {
+        continue;
+      }
+      return null; // Genuinely malformed -> fail entire string
+    }
 
     let daySpec = m[1];
     const timePart = m[2].trim();
@@ -1101,7 +1141,11 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
       : "";
 
     if (isClinic) {
-      // Clinic card
+      // Clinic card — use parsed hours if available, raw text fallback
+      const clinicHoursInfo = r.hours ? getHoursInfo(r.hours, jstCtx) : null;
+      const clinicHoursHtml = (clinicHoursInfo && clinicHoursInfo.parsed)
+        ? renderHoursHtml(r.hours, clinicHoursInfo)
+        : (r.hours ? `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(r.hours)}</div>` : ``);
       li.innerHTML = `
         <div class="card clinic-card">
           <div class="cardHead">
@@ -1118,7 +1162,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
             ${urlLink ? `<span>🔗 ${urlLink}</span>` : ``}
             <span>📍 ${gmapLink}</span>
           </div>
-          ${r.hours ? `<div class="detail"><span class="k">対応可能時間帯</span> ${escapeHtml(r.hours)}</div>` : ``}
+          ${clinicHoursHtml}
         </div>
       `;
     } else {

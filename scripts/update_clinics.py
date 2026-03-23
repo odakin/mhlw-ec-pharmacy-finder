@@ -141,6 +141,41 @@ def normalize_hours(h: str) -> str:
     return h.translate(_FW_MAP).strip()
 
 
+def normalize_obgyn(val: str) -> str:
+    """Normalize obgyn field (産婦人科の有無).
+
+    PDF parsing sometimes leaks URL fragments from the adjacent column
+    into this field (e.g. 'pital/ 有', 'hayashi 有').
+    Strip ASCII prefix garbage while preserving the Japanese content.
+    """
+    if not val:
+        return ""
+    # Strip leading URL fragments (ASCII chars, digits, slashes, dots)
+    cleaned = re.sub(r'^[a-zA-Z0-9/.:_\-]+\s*', '', val)
+    return cleaned if cleaned else val
+
+
+def normalize_stock(val: str) -> str:
+    """Normalize stock field for consistent frontend filtering.
+
+    Frontend filters on startsWith("有") or === "あり".
+    Fix known edge cases where valid stock info doesn't match this pattern.
+    """
+    if not val:
+        return ""
+    # Fix column offset artifact: leading "0 " or standalone "0"
+    s = re.sub(r'^0\s+', '', val)
+    if s == '0':
+        return ''
+    # Normalize "ほぼ有..." -> "有（在庫少）"
+    if s.startswith('ほぼ有'):
+        return '有（在庫少）'
+    # Normalize "少々有" -> "有（少量）"
+    if s == '少々有':
+        return '有（少量）'
+    return s
+
+
 def guess_pref_from_address(addr: str) -> str:
     """Extract prefecture from address string."""
     for pref in PREFECTURES:
@@ -279,9 +314,9 @@ def parse_pdf(pdf_path: Path, pref: str) -> list[dict]:
                     "addr": full_addr,
                     "tel": clean_phone(tel),
                     "url": normalize_url(url),
-                    "obgyn": obgyn,
+                    "obgyn": normalize_obgyn(obgyn),
                     "hours": normalize_hours(hours),
-                    "stock": stock,
+                    "stock": normalize_stock(stock),
                 })
 
     return records
