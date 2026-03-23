@@ -83,7 +83,7 @@ async function loadClinics() {
       if (!st.startsWith("有") && st !== "あり") continue;
       rr._isClinic = true;
       rr._blob = buildSearchBlob(rr);
-      rr._hoursParsed = parseHours(normalizeHoursText(rr.hours || ""));
+      rr._hoursParsed = parseHours(rr.hours);
       recs.push(rr);
     }
     CLINICS = recs;
@@ -1451,7 +1451,7 @@ async function init() {
       // Skip records with no address (consolidated/defunct — no usable info)
       if (!rr.addr) continue;
       rr._blob = buildSearchBlob(rr);
-      rr._hoursParsed = parseHours(normalizeHoursText(rr.hours || ""));
+      rr._hoursParsed = parseHours(rr.hours);
       real.push(rr);
     }
     DATA = real;
