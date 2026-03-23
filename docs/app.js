@@ -318,10 +318,11 @@ function normalizeHoursText(raw) {
   s = s.replace(/([月火水木金土日祝])[;；]/g, "$1:");
   // Normalize ｡ to , (segment separator)
   s = s.replace(/｡/g, ",");
-  // Strip parenthesized exclusion notes: （除く水曜）, (木は除く), (水曜以外) etc.
+  // Strip parenthesized exclusion/closure notes: （除く水曜）, (木は除く), (水曜以外),
+  // （木曜休診）, (水曜は休み) etc.
   // These corrupt the day:time structure if left in place. Stripping loses the
   // exclusion detail but preserves the base schedule (Missing info > Wrong info).
-  s = s.replace(/[（(][^)）]*(?:除く|以外)[^)）]*[）)]/g, "");
+  s = s.replace(/[（(][^)）]*(?:除く|以外|休診|休み)[^)）]*[）)]/g, "");
   // "Xを除くY" — strip the "Xを除く" prefix, preserving the following day spec Y.
   // e.g. "水を除く月-金:9:00" → "月-金:9:00" (水 exclusion lost, but base schedule preserved)
   // Only strip when followed by a day char (to avoid stripping standalone "祝を除く" notes)
