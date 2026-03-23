@@ -217,8 +217,15 @@ function normalizeHoursText(raw) {
     return String(hr < 12 ? hr + 12 : hr);
   });
   s = s.replace(/AM\s*(\d{1,2})/gi, "$1");
-  // 午前/午後 → strip or convert (午後3:30 → 15:30, 午前9:00 → 9:00)
+  // 午前/午後 → strip or convert (午後3:30-6:30 → 15:30-18:30, 午前9:00 → 9:00)
   // Only when followed by a digit (avoid matching 午前診, 午後休診)
+  // Handle time ranges: 午後3:30-6:30 → both ends need +12
+  s = s.replace(/午後\s*(\d{1,2})(:\d{2}\s*[-~]\s*)(\d{1,2})/g, (_, h1, sep, h2) => {
+    const hr1 = parseInt(h1);
+    const hr2 = parseInt(h2);
+    return String(hr1 < 12 ? hr1 + 12 : hr1) + sep + String(hr2 < 12 ? hr2 + 12 : hr2);
+  });
+  // Fallback: 午後 followed by single time (no range)
   s = s.replace(/午後\s*(\d{1,2})/g, (_, h) => {
     const hr = parseInt(h);
     return String(hr < 12 ? hr + 12 : hr);
@@ -250,8 +257,8 @@ function normalizeHoursText(raw) {
   s = s.replace(/[（(]([月火水木金土日祝・,\-~]+)[）)]/g, "$1");
   // Strip empty parens left over from combined normalizations (e.g. (祝を除く)→()→"")
   s = s.replace(/[（(][）)]/g, "");
-  // 24時間 -> all day marker (strip trailing text like 可, 対応 etc.)
-  s = s.replace(/24時間.*$/g, "毎日:0:00-24:00");
+  // 24時間 -> all day marker (strip known short suffixes; preserve longer content)
+  s = s.replace(/24時間(?:(?:対応|営業|相談|救急)?可能?)?/g, "毎日:0:00-24:00");
   // Insert : between day spec and time when missing (月-土9:00 -> 月-土:9:00)
   // Also handle space separator: "月-金 9:00" -> "月-金:9:00"
   s = s.replace(/([月火水木金土日祝])\s+(\d{1,2}:\d{2})/g, "$1:$2");
