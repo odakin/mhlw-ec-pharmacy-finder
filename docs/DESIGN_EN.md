@@ -104,7 +104,7 @@ The status bar is an operational report from the search engine — it accurately
 
 ### Implementation
 
-- **`update_data.py`**: Skips addr-empty records. `meta.totalPublished = len(records) + skipped` preserves the MHLW-published count
+- **`update_data.py`**: Skips addr-empty records. `meta.totalPublished = len(records) + skipped` preserves the MHLW-published count. `meta.scriptHash` ensures automatic cache invalidation (see §8)
 - **`app.js` (init)**: `!rr.addr` as a defensive filter (safety net against direct data.json edits)
 - **`app.js` (highlight)**: `META.totalPublished || DATA.length` — falls back gracefully for older data without totalPublished
 
@@ -198,6 +198,50 @@ For details on the rationale for each technology choice and rejected alternative
 - We do not want to impose server operation costs and maintenance burden on a personal project
 - As an emergency tool, we want to eliminate the risk of server downtime (GitHub Pages offers high availability)
 - Data updates are processed as daily batches via GitHub Actions. Real-time updates are unnecessary (MHLW data is updated approximately once per month)
+
+---
+
+## 8. Data Pipeline Cache Design
+
+`update_data.py` fetches and processes MHLW's XLSX to generate `data.json`. When a cache file (`data/data_*.json`) already exists for the same as-of date, the script skips regeneration to avoid unnecessary downloads and noisy git diffs.
+
+### Problem: Incomplete Cache Key
+
+Whether a cache is "valid" should depend on **two inputs combined**:
+
+1. **Source data** (MHLW XLSX) — identified by the `as_of` date
+2. **Processing logic** (`update_data.py` itself) — if the script changes, output changes
+
+Originally, only the source data match was checked. This meant that when the processing logic was modified (e.g., adding empty record exclusion, adding meta fields), the existing cache was still judged "valid," and the new logic was never applied.
+
+This has the same structure as a classic build system problem: if you modify source code but do not recompile the object files, the old binary continues to be used.
+
+### Solution: Input-Hashed Cache Invalidation
+
+`meta.scriptHash` stores the SHA-256 hash (first 16 characters) of the script itself. During cache validation, this hash is compared against the current script's hash. A mismatch triggers a cache miss and regeneration from the XLSX.
+
+```
+Cache key = as_of date + scriptHash
+  → Same source data + different script → cache miss
+  → Same script + different source data → cache miss
+```
+
+This technique follows the same principle as Docker layer caching, Webpack's contenthash, and Nix/Bazel build hashes: **never use the cache unless all inputs match.**
+
+### Why a Hash Instead of a Version Number?
+
+| Approach | Advantage | Disadvantage |
+|---|---|---|
+| Manual version number | Explicit | Can be forgotten — reproduces the same structural problem as this bug |
+| Script hash | **Fully automatic.** Impossible to forget | Comment-only changes also trigger regeneration (no practical impact — regeneration takes seconds) |
+
+Safety mechanisms that depend on manual procedures break the moment the procedure is forgotten. What can be automated, should be automated.
+
+### Implementation
+
+- **`_script_hash()`**: `Path(__file__).read_bytes()` → SHA-256 → first 16 characters
+- **`looks_like_valid_app_json()`**: `meta.scriptHash != _script_hash()` → `False` (cache invalid)
+- **Generation**: `meta.scriptHash = _script_hash()` embeds the hash
 
 ---
 

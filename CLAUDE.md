@@ -13,7 +13,7 @@
 ```
 docs/                    → GitHub Pages 公開ディレクトリ
   index.html / app.js / style.css  → フロントエンド（バニラJS）
-  data.json              → 薬局データ（10,128件）
+  data.json              → 薬局データ（9,951件。空レコード除外前の厚労省公表件数は10,128件）
   clinics.json           → 医療機関データ（3,107件、PDFパース）
   geocode_cache.json     → ジオコーディング結果（フロントエンド配信用コピー）
   FEATURE_SPEC.html / HOURS_PARSER.html → ドキュメントHTML（marked.jsで.mdをfetch+render）
@@ -37,7 +37,7 @@ docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（
 
 ```json
 {
-  "meta": { "asOf": "2026-03-10", "records": 10128, ... },
+  "meta": { "asOf": "2026-03-10", "records": 9951, "totalPublished": 10128, "scriptHash": "...", ... },
   "data": [
     {
       "id": 66,
