@@ -52,9 +52,9 @@ python -m http.server 8000
 
 ## 2) 整形済みデータ
 
-- `data/mhlw_ec_pharmacies_cleaned_2026-03-10.xlsx`
-- `data/mhlw_ec_pharmacies_cleaned_2026-03-10.csv`（UTF-8 BOM）
-- `data/data_2026-03-10.json`（Web/LINE Bot用）
+- `data/mhlw_ec_pharmacies_cleaned_2026-03-25.xlsx`
+- `data/mhlw_ec_pharmacies_cleaned_2026-03-25.csv`（UTF-8 BOM）
+- `data/data_2026-03-25.json`（Web/LINE Bot用）
 
 追加した列（例）:
 - `市区町村_推定`：住所文字列から市区町村相当を推定（完璧ではありません）
