@@ -201,6 +201,15 @@ function isJapaneseHoliday(date) {
 const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
 const DAY_MAP = { "日": 0, "月": 1, "火": 2, "水": 3, "木": 4, "金": 5, "土": 6, "祝": -1 };
 
+function dayCharsToIndices(str) {
+  const indices = [];
+  for (const ch of str) {
+    const idx = DAY_MAP[ch];
+    if (idx != null && idx >= 0) indices.push(idx);
+  }
+  return indices;
+}
+
 function normalizeHoursText(raw) {
   let s = (raw || "").toString()
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
@@ -609,21 +618,98 @@ function parseDaySpecExtended(spec) {
   return null;
 }
 
+// Apply full-day closures to schedule: remove closedDays from each entry's days array.
+// Safety: if removal would empty the entire schedule, revert and push a fallback note.
+function applyClosedDays(schedule, closedDays, hoursNotes) {
+  if (!closedDays.size) return;
+  const backup = schedule.map(e => ({ ...e, days: [...e.days] }));
+  for (const entry of schedule) {
+    entry.days = entry.days.filter(d => !closedDays.has(d));
+  }
+  const remaining = schedule.filter(e => e.days.length > 0);
+  if (remaining.length > 0) {
+    schedule.length = 0;
+    schedule.push(...remaining);
+  } else {
+    // Revert: closedDays would wipe entire schedule
+    schedule.length = 0;
+    schedule.push(...backup);
+    hoursNotes.push("定休日情報あり（詳細は店舗にお問い合わせください）");
+    closedDays.clear();
+  }
+}
+
 function parseHours(raw) {
-  // Returns: { schedule: [{days: [0-6], open, close}, ...], holidaySchedule: [{open, close}], holidayClosed: bool } or null
+  // Returns: { schedule, holidaySchedule, holidayClosed, closedDays: number[], hoursNotes: string[] } or null
   if (!raw) return null;
 
   // Detect holidayClosed from raw text BEFORE normalization strips it
   const rawNorm = (raw || "").toString()
     .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/[・･•·]/g, "・").replace(/[;；]/g, ";")
-    .replace(/祝祭日/g, "祝").replace(/祝日/g, "祝");
+    .replace(/祝祭日/g, "祝").replace(/祭日/g, "祝").replace(/祝日/g, "祝")
+    .replace(/[【】]/g, " ");
   const holidayClosed = /祝[・:：は;]?\s*(休|閉局|定休|休業|休日|終日閉局)/.test(rawNorm)
     || /[月火水木金土日][・,]?祝[・:：は;]?\s*(休|閉局|定休|休業|休日|終日閉局)/.test(rawNorm)
     || /休[業日]?\s*[：:;]?\s*[月火水木金土日曜・,\s]*祝/.test(rawNorm)
     || /定休[日]?\s*[：:;\s]*[月火水木金土日・,\s]*祝/.test(rawNorm)
     || /祝を?除く/.test(rawNorm)
     || /[（(]祝[・年末年始]*除く[）)]/.test(rawNorm);
+
+  // Extract closed-day info from raw text BEFORE normalization strips it.
+  // Two categories: closedDays (full-day, applied to schedule) vs hoursNotes (partial/complex, displayed as text).
+  const closedDays = new Set();
+  const hoursNotes = [];
+
+  // Pattern A: 定休日/休診日/休業日 + day list (【定休日】水曜, 定休日:日祝 etc.)
+  // Capture stops when a day char is followed by range/time indicators (-, :, ~, digit)
+  // to avoid consuming schedule specs like 月-金 after the closed-day list.
+  rawNorm.replace(/(?:定休|休診|休業)[日]?\s*[:：]?\s*((?:[月火水木金土日祝・,\s曜](?![-:~\d]))+)/g, (_, list) => {
+    dayCharsToIndices(list.replace(/曜日?/g, "")).forEach(d => closedDays.add(d));
+  });
+
+  // Pattern B: Xを除くY (水を除く月-金, 木曜日を除く etc.)
+  // 祝 is handled by holidayClosed, skip here
+  rawNorm.replace(/([月火水木金土日]+)[曜日]*を?除く/g, (_, days) => {
+    dayCharsToIndices(days).forEach(d => closedDays.add(d));
+  });
+
+  // Pattern C: Parenthesized exclusions (（除く水曜）,（木は除く）,（水曜以外）)
+  rawNorm.replace(/[（(]([^)）]*(?:除く|以外)[^)）]*)[）)]/g, (_, inner) => {
+    const cleanInner = inner.replace(/曜日?/g, "");
+    const days = dayCharsToIndices(cleanInner);
+    // Route to notes if: partial (午前/午後/time), or complex (contains non-day kanji like 週/最終/月末)
+    const isPartial = /午[前後]|\d:\d{2}/.test(inner);
+    // Strip day chars, hiragana (particles), known keywords — remaining kanji = complex (最終, 週, 年末 etc.)
+    const isComplex = /[^\u0000-\u007f]/.test(cleanInner.replace(/[月火水木金土日祝除・,\s\u3040-\u309f]/g, ""));
+    if (days.length > 0 && !isPartial && !isComplex) {
+      days.forEach(d => closedDays.add(d));
+    } else if (days.length > 0) {
+      hoursNotes.push(inner.replace(/[（()）]/g, "").trim());
+    }
+  });
+
+  // Pattern D: X休み/X休診 (土日祝休み, 水曜午後休診 etc.)
+  // Negative lookbehind prevents matching ordinals (第2土曜休み = specific weeks, not every week)
+  rawNorm.replace(/(?<!第\d)([月火水木金土日][月火水木金土日・,曜]*)(午[前後])?\s*(休み|休診|定休)/g, (m, dayStr, partial) => {
+    const days = dayCharsToIndices(dayStr.replace(/曜日?/g, ""));
+    if (partial) {
+      hoursNotes.push(m.replace(/[・,]/g, "").trim());
+    } else {
+      days.forEach(d => closedDays.add(d));
+    }
+  });
+
+  // Pattern E: Parenthesized closure (（水曜は休診）,（木休診）)
+  rawNorm.replace(/[（(]([^)）]*(?:休診|休み)[^)）]*)[）)]/g, (_, inner) => {
+    if (/除く|以外/.test(inner)) return; // already handled by Pattern C
+    const days = dayCharsToIndices(inner.replace(/曜日?/g, ""));
+    if (days.length > 0 && /午[前後]/.test(inner)) {
+      hoursNotes.push(inner.trim());
+    } else if (days.length > 0) {
+      days.forEach(d => closedDays.add(d));
+    }
+  });
 
   const text = normalizeHoursText(raw);
   if (!text) return null;
@@ -641,18 +727,25 @@ function parseHours(raw) {
       const m = r.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
       if (m) sched.push({ days: allDays, open: m[1], close: m[2] });
     }
-    if (sched.length) return { schedule: sched, holidaySchedule: [], holidayClosed };
+    if (sched.length) {
+      applyClosedDays(sched, closedDays, hoursNotes);
+      return { schedule: sched, holidaySchedule: [], holidayClosed, closedDays: [...closedDays], hoursNotes };
+    }
   }
 
   // Handle "毎日:9:00-20:00" pattern (also bare "毎日" = 24h)
   if (/^毎日\s*$/.test(text)) {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
-    return { schedule: [{ days: allDays, open: "0:00", close: "24:00" }], holidaySchedule: [], holidayClosed };
+    const sched24 = [{ days: allDays, open: "0:00", close: "24:00" }];
+    applyClosedDays(sched24, closedDays, hoursNotes);
+    return { schedule: sched24, holidaySchedule: [], holidayClosed, closedDays: [...closedDays], hoursNotes };
   }
   const everyDayMatch = text.match(/^毎日\s*:?\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
   if (everyDayMatch) {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
-    return { schedule: [{ days: allDays, open: everyDayMatch[1], close: everyDayMatch[2] }], holidaySchedule: [], holidayClosed };
+    const schedEvery = [{ days: allDays, open: everyDayMatch[1], close: everyDayMatch[2] }];
+    applyClosedDays(schedEvery, closedDays, hoursNotes);
+    return { schedule: schedEvery, holidaySchedule: [], holidayClosed, closedDays: [...closedDays], hoursNotes };
   }
 
   const segments = splitHoursSegments(text);
@@ -746,7 +839,8 @@ function parseHours(raw) {
     }
   }
 
-  return schedule.length ? { schedule, holidaySchedule, holidayClosed } : null;
+  applyClosedDays(schedule, closedDays, hoursNotes);
+  return schedule.length ? { schedule, holidaySchedule, holidayClosed, closedDays: [...closedDays], hoursNotes } : null;
 }
 
 function timeToMinutes(hhmm) {
@@ -851,7 +945,8 @@ function getHoursInfo(raw, ctx, cachedParse) {
 
   return {
     parsed: true, todayRanges, isOpen, allDays, todayDow,
-    isHoliday, todayUsingHoliday, holidayRanges, holidayClosed
+    isHoliday, todayUsingHoliday, holidayRanges, holidayClosed,
+    hoursNotes: parsed.hoursNotes || []
   };
 }
 
@@ -909,7 +1004,17 @@ function renderHoursHtml(raw, info, afterHoursFlag) {
       schedHtml += `<div${holCls}><span class="day">祝</span> ${times}</div>`;
     }
   }
-  schedHtml += `</div><div class="hours-note">※営業状況は店舗にご確認ください</div></details>`;
+  schedHtml += `</div>`;
+  // Display exclusion/closure notes extracted from raw hours text
+  const notes = info.hoursNotes || [];
+  if (notes.length) {
+    schedHtml += `<div class="hours-exclusion-notes">`;
+    for (const note of notes) {
+      schedHtml += `<div class="exclusion-note">※${escapeHtml(note)}</div>`;
+    }
+    schedHtml += `</div>`;
+  }
+  schedHtml += `<div class="hours-note">※営業状況は店舗にご確認ください</div></details>`;
 
   return todayHtml + schedHtml;
 }
