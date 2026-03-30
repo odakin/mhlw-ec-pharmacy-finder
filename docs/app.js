@@ -249,7 +249,8 @@ function normalizeHoursText(raw) {
   // Strip leading store/facility names before time specs (アサヒ薬局本店営業時間(...) etc.)
   s = s.replace(/^[^\d月火水木金土日祝(（]*営業時間\s*/g, "");
   // Strip clinic section labels (午前診:, 夜診:, 午後診: etc.)
-  s = s.replace(/(?:午前|午後|夜)診\s*[:：]?\s*/g, "");
+  // Negative lookahead prevents matching 午後診察, 午後診療
+  s = s.replace(/(?:午前|午後|夜)診(?![察療])\s*[:：]?\s*/g, "");
   // Normalize circled numbers to comma separators (①②③ etc.)
   s = s.replace(/[①②③④⑤⑥⑦⑧⑨⑩]/g, ",");
   // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00)
@@ -265,8 +266,9 @@ function normalizeHoursText(raw) {
   s = s.replace(/全日/g, "毎日");
   s = s.replace(/^常時.*$/, "毎日");
   s = s.replace(/^年中$/, "毎日");
-  // 平日 followed by explicit day list: strip redundant 平日 (平日 月火水金 → 月火水金)
-  s = s.replace(/平日[\s:：]*([月火水木金土日])/g, "$1");
+  // 平日 followed by explicit weekday list: strip redundant 平日 (平日 月火水金 → 月火水金)
+  // Only match weekday chars (月-金), not 土日, to preserve "平日+土" = Mon-Sat intent
+  s = s.replace(/平日[\s:：]*([月火水木金])/g, "$1");
   // Standalone 平日 → 月-金
   s = s.replace(/平日/g, "月-金");
   // 祝日 -> 祝
@@ -362,6 +364,8 @@ function normalizeHoursText(raw) {
   // Normalize "から" to "-" in day ranges (月から金 -> 月-金)
   s = s.replace(/([月火水木金土日])から([月火水木金土日])/g, "$1-$2");
   // Normalize "と" to "・" between day chars (月と金 -> 月・金)
+  // Repeat for chains (月と水と金 needs two passes)
+  s = s.replace(/([月火水木金土日])と([月火水木金土日])/g, "$1・$2");
   s = s.replace(/([月火水木金土日])と([月火水木金土日])/g, "$1・$2");
   // Normalize "は" between day spec and time (月は9:00 -> 月:9:00)
   s = s.replace(/([月火水木金土日祝])は(\d{1,2}:\d{2})/g, "$1:$2");
