@@ -126,7 +126,9 @@
 5. rawNorm に `祭日→祝`、`【】→空白` の正規化を追加（抽出精度向上）
 6. **4軸チェックで発見した3問題を修正**:
    - Pattern B: ordinal/temporal 除外（第2日曜を除く等7件）、複合語（休館日2件）、ひらがなコンテキスト（の日曜日を除く等）の false positive を negative lookbehind で防止
-   - applyClosedDays: 専用エントリ保護（水:8:00-16:00 のような単独曜日エントリは closedDays で消さない）
+   - applyClosedDays: conservative rule（1エントリ+多曜日のみ適用、multi-entry は notes のみ）
+   - 全除外情報を hoursNotes に集約（closedDays 適用の有無にかかわらず注記表示、ノイズフィルタ付き）
+   - 注記表示をグリッドの上に移動、amber 背景ストリップで視認性向上
 
 ## 残タスク
 
