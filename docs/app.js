@@ -240,11 +240,27 @@ function normalizeHoursText(raw) {
   // Strip common prefixes that appear before day:time specs
   s = s.replace(/^受付[時間]*\s*/g, "");
   s = s.replace(/毎週\s*/g, "");
-  // Normalize 【...】 brackets: strip if non-day content, unwrap if day-spec
-  // 【月火水金】9:00 → 月火水金 9:00, 【営業時間】→ "", 【定休日】→ ""
+  // Strip 【定休日】/【休日】/【休診日】 and their following closed-day list as a unit.
+  // e.g. 【定休日】日・祝 → ",", 【定休日】土曜日 水曜日 → ","
+  // Must run BEFORE generic 【】 handler to prevent the closed-day list from leaking.
+  // After the bracket, greedily consume closed-day text, but STOP when a day char
+  // is followed by a schedule indicator (:-/ digit or day-range hyphen), preserving the schedule.
+  // 午[前後] handles partial closures like 水曜午後,日祝 (Wed PM + Sun + holidays).
+  s = s.replace(
+    /【[^】]*(?:定休|休診|休業|休日)[^】]*】\s*(?:[・,曜\s]|午[前後]|[月火水木金土日祝](?![\-~:]\s*[月火水木金土日祝\d])(?!\d))*/g,
+    ","
+  );
+  // Normalize 【...】 brackets: unwrap if day-spec, replace with space otherwise
+  // 【月火水金】9:00 → 月火水金 9:00, 【営業時間】→ " ", 【水午後なし】→ " "
+  // Strict check: inner must consist ONLY of day chars, separators, and modifiers
+  // (平 for 平日, 曜 for 土曜 etc., 第\d for ordinals like 第1・3土曜, parens for 平日（月水木金）)
+  // Rejects: 水午後なし(午後なし≠day), 営業時間(営業≠day)
+  // Using space (not comma) preserves adjacency of surrounding time structures:
+  //   【平日】10-12:30 【水午後なし】16-19:00 → 平日 10-12:30 16-19:00 (times stay together)
+  // Closed-day brackets (定休日 etc.) use comma via their dedicated handler above.
   s = s.replace(/【([^】]*)】/g, (_, inner) => {
-    if (/[月火水木金土日祝]/.test(inner)) return inner;
-    return "";
+    if (/^[月火水木金土日祝平曜・,.\-~\s～（()）第\d:\/]+$/.test(inner)) return inner;
+    return " ";
   });
   // Strip leading store/facility names before time specs (アサヒ薬局本店営業時間(...) etc.)
   s = s.replace(/^[^\d月火水木金土日祝(（]*営業時間\s*/g, "");
@@ -253,8 +269,14 @@ function normalizeHoursText(raw) {
   s = s.replace(/(?:午前|午後|夜)診(?![察療])\s*[:：]?\s*/g, "");
   // Normalize circled numbers to comma separators (①②③ etc.)
   s = s.replace(/[①②③④⑤⑥⑦⑧⑨⑩]/g, ",");
-  // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00)
+  // Clean up commas from circled number replacement
+  s = s.replace(/^,+/, "");
+  s = s.replace(/,{2,}/g, ",");
+  s = s.replace(/:,/g, ":");
+  // Normalize ~ to - in time ranges (9:00~18:00 -> 9:00-18:00, 10~12:30 -> 10-12:30)
   s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2}:\d{2})/g, "$1-$2");
+  s = s.replace(/(\d{1,2})~(\d{1,2}:\d{2})/g, "$1-$2");
+  s = s.replace(/(\d{1,2}:\d{2})~(\d{1,2})/g, "$1-$2");
   // Normalize ~ to - in day ranges (月~金 -> 月-金)
   s = s.replace(/([月火水木金土日祝])~([月火水木金土日祝])/g, "$1-$2");
   // Strip 曜日 suffix (月曜日 -> 月, but 金曜日曜 -> 金日 not 金曜)
