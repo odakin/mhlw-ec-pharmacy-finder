@@ -124,6 +124,9 @@
 3. **安全弁**: closedDays 適用で全曜日が消える場合は適用取消 + fallback note
 4. **分類基準**: 午前/午後/時刻が絡む → notes、曜日のみ → closedDays、第N曜日 → スキップ（特定週のみ）、複雑テキスト（週/最終等） → notes
 5. rawNorm に `祭日→祝`、`【】→空白` の正規化を追加（抽出精度向上）
+6. **4軸チェックで発見した3問題を修正**:
+   - Pattern B: ordinal/temporal 除外（第2日曜を除く等7件）、複合語（休館日2件）、ひらがなコンテキスト（の日曜日を除く等）の false positive を negative lookbehind で防止
+   - applyClosedDays: 専用エントリ保護（水:8:00-16:00 のような単独曜日エントリは closedDays で消さない）
 
 ## 残タスク
 

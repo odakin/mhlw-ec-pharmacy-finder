@@ -619,9 +619,20 @@ function parseDaySpecExtended(spec) {
 }
 
 // Apply full-day closures to schedule: remove closedDays from each entry's days array.
+// Protection: if a closedDay is the SOLE day of an entry (dedicated schedule like 水:8:00-16:00),
+// that entry is preserved — the facility has explicit different hours for that day, so it's not truly "closed".
 // Safety: if removal would empty the entire schedule, revert and push a fallback note.
 function applyClosedDays(schedule, closedDays, hoursNotes) {
   if (!closedDays.size) return;
+  // Find days that have their own dedicated schedule entry (sole day in an entry)
+  const dedicatedDays = new Set();
+  for (const entry of schedule) {
+    if (entry.days.length === 1) dedicatedDays.add(entry.days[0]);
+  }
+  // Remove dedicated days from closedDays — they have explicit hours, not truly closed
+  for (const d of dedicatedDays) closedDays.delete(d);
+  if (!closedDays.size) return;
+
   const backup = schedule.map(e => ({ ...e, days: [...e.days] }));
   for (const entry of schedule) {
     entry.days = entry.days.filter(d => !closedDays.has(d));
@@ -669,8 +680,13 @@ function parseHours(raw) {
   });
 
   // Pattern B: Xを除くY (水を除く月-金, 木曜日を除く etc.)
-  // 祝 is handled by holidayClosed, skip here
-  rawNorm.replace(/([月火水木金土日]+)[曜日]*を?除く/g, (_, days) => {
+  // 祝 is handled by holidayClosed, skip here.
+  // Guards:
+  //   - Negative lookbehind for ordinal/temporal markers (第\d, 最終, 月末)
+  //     → "第2日曜を除く" = specific-week exclusion, not every-week closure
+  //   - Negative lookbehind for compound-word kanji (休館日, 3が日 etc.)
+  //     → "休館日を除く" is a building-closure, not Sunday
+  rawNorm.replace(/(?<!第[一二三四五\d][月火水木金土日曜]*)(?<!最終[月火水木金土日曜]*)(?<![\u3040-\u9fff])([月火水木金土日]+)[曜日]*を?除く/g, (_, days) => {
     dayCharsToIndices(days).forEach(d => closedDays.add(d));
   });
 
