@@ -123,6 +123,7 @@ del { color: #888; }
 <li>Today's business status is highlighted (Open / Closed / Day off)</li>
 <li>Full weekly schedule shown in a collapsible section</li>
 <li>Unparseable entries (2.9%) display raw data as-is. See <a href="HOURS_PARSER_EN.html">HOURS_PARSER</a> for design details</li>
+<li><strong>Exclusion info preservation and display</strong>: Closed-day, exclusion, and partial-closure info is extracted before normalization and shown as amber-highlighted notes above the schedule grid in the collapsible section. Unambiguous closures are also applied to the schedule (conservative rule). Design principle: <strong>Correct &gt; Correct + caveat &gt; Unknown &gt; Wrong</strong> (see DESIGN.md §6)</li>
 <li>Holiday support: national holidays (kokumin no shukujitsu) are determined by pure calculation; holiday closures and holiday-specific hours are displayed correctly</li>
 <li>Late-night business hours (close &gt; 24:00) with date-crossing logic</li>
 <li>All entries include the note: "Please confirm business hours directly with the pharmacy"</li>

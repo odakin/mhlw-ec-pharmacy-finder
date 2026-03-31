@@ -26,9 +26,16 @@ Each time a new rule was added, cases were discovered where it interfered with e
 ```
 Raw text
   |
-  +-> holidayClosed detection (at start of parseHours, before normalization)
+parseHours() preamble (before normalization):
+  +-> rawNorm generation (lightweight: fullwidth→halfwidth, 祭日→祝, 【】→space)
+  +-> holidayClosed detection (6 regex patterns)
+  +-> closedDays extraction (5 patterns: closed-day list/exclusion/paren/suffix/paren-closure)
+  +-> hoursNotes extraction (all exclusion info preserved as supplementary text)
   |
-normalizeHoursText()  <- Text normalization (75 replacement rules)
+normalizeHoursText()  <- Text normalization (80+ replacement rules)
+  |  Dedicated 【定休日】 handler (strips bracket + following closed-day list)
+  |  Generic 【】 handler (unwrap day-specs, space for others)
+  |  ① comma cleanup, bare-hour tilde normalization
   |
 Normalized text (e.g., "月-金:9:00-18:00,土:9:00-13:00")
   |
@@ -36,17 +43,24 @@ splitHoursSegments()  <- Split by day-of-week groups
   |
 Segment array (e.g., ["月-金:9:00-18:00", "土:9:00-13:00"])
   |
-parseHours()          <- Extract days + time ranges + holiday info from each segment
+parseHours() body     <- Extract days + time ranges + holiday info from each segment
   |
-Structured data: { schedule, holidaySchedule, holidayClosed }
+applyClosedDays()     <- Conservatively remove closedDays from schedule
+  |                       (single multi-day entry only; ambiguous cases skipped)
   |
-getHoursInfo(raw, ctx) <- Determine today's business status (considering holidays & overnight hours)
-  |                        ctx = getJstContext() (compute JST date/time once per batch)
-  |                        isJapaneseHoliday() for holiday detection
+Structured data: { schedule, holidaySchedule, holidayClosed, closedDays, hoursNotes }
   |
-{ todayRanges, isOpen, isHoliday, holidayClosed, ... }
+getHoursInfo(raw, ctx) <- Determine today's business status
+  |                        ctx = getJstContext(), isJapaneseHoliday()
   |
-renderHoursHtml(raw, info) <- Generate HTML: badges + weekly schedule + holiday row
+{ todayRanges, isOpen, isHoliday, holidayClosed, hoursNotes, ... }
+  |
+renderHoursHtml(raw, info)
+  |  Badge + today's hours
+  |  Collapsible "Full Schedule":
+  |    ※ Exclusion notes (amber stripe, above grid)
+  |    Weekly schedule grid + holiday row
+  |    ※ Please confirm with the facility
 ```
 
 ## normalizeHoursText(): Why 75 Rules?
@@ -141,9 +155,21 @@ Segment delimiters are similarly varied:
 
 #### 5b: Exclusion Information Extraction (inside parseHours, before normalization)
 
-Using the same approach as 5a, `parseHours()` extracts closed-day and exclusion information from `rawNorm` using 5 patterns (closed-day declarations, exclusion prefixes, parenthesized exclusions, closure suffixes, parenthesized closures) plus 3 ordinal/temporal note catchers.
+Using the same approach as 5a, `parseHours()` extracts closed-day and exclusion information from `rawNorm`:
 
-- **closedDays**: Unambiguous full-day closures. Applied conservatively to the schedule — only when the day appears in exactly one multi-day entry. Ambiguous cases (multi-entry, ordinal, temporal) are left in the schedule.
+| Pattern | Target | Example | closedDays | hoursNotes |
+|---|---|---|---|---|
+| A: Closed-day list | `定休日:水曜` | `定休日 水` | Wed(3) | `定休日 水` |
+| B: X-exclusion | `水を除く月-金` | `水を除く` | Wed(3) | `水を除く` |
+| C: Paren exclusion | `（除く水曜）` | `除く水曜` | Wed(3) | `除く水曜` |
+| D: X-closure | `水曜午後休診` | `水曜午後休診` | — | `水曜午後休診` |
+| E: Paren closure | `（木休診）` | `木休診` | Thu(4) | `木休診` |
+
+Plus 3 ordinal/temporal note catchers (e.g., `第2日曜を除く` → notes only, no closedDays).
+
+**Classification**: partial (AM/PM/time) → notes only. Day-only → closedDays + notes. Ordinal/temporal/compound → notes only (blocked by Pattern B negative lookbehinds).
+
+- **closedDays**: Applied conservatively — only when the day appears in exactly one multi-day entry (e.g., removing Thu from Mon-Fri). If a day appears in multiple entries (which may have different hours), it is NOT removed.
 - **hoursNotes**: ALL exclusion info preserved as supplementary text, regardless of whether closedDays were applied. Displayed as amber-highlighted notes above the schedule grid.
 
 Principle: **Never discard information.** Notes are the primary communication; closedDays is the conservative optimization. (See DESIGN.md §6: "A parser is a mapping of reality. Information beyond the model's limits must be preserved outside the mapping.")

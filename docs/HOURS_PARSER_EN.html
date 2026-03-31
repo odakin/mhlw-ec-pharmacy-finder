@@ -63,9 +63,16 @@ ul, ol { padding-left: 2em; }
 <h2 id="architecture-overview">Architecture Overview</h2>
 <pre><code>Raw text
   |
-  +-&gt; holidayClosed detection (at start of parseHours, before normalization)
+parseHours() preamble (before normalization):
+  +-&gt; rawNorm generation (lightweight: fullwidth→halfwidth, 祭日→祝, 【】→space)
+  +-&gt; holidayClosed detection (6 regex patterns)
+  +-&gt; closedDays extraction (5 patterns: closed-day list/exclusion/paren/suffix/paren-closure)
+  +-&gt; hoursNotes extraction (all exclusion info preserved as supplementary text)
   |
-normalizeHoursText()  &lt;- Text normalization (75 replacement rules)
+normalizeHoursText()  &lt;- Text normalization (80+ replacement rules)
+  |  Dedicated 【定休日】 handler (strips bracket + following closed-day list)
+  |  Generic 【】 handler (unwrap day-specs, space for others)
+  |  ① comma cleanup, bare-hour tilde normalization
   |
 Normalized text (e.g., &quot;月-金:9:00-18:00,土:9:00-13:00&quot;)
   |
@@ -73,17 +80,24 @@ splitHoursSegments()  &lt;- Split by day-of-week groups
   |
 Segment array (e.g., [&quot;月-金:9:00-18:00&quot;, &quot;土:9:00-13:00&quot;])
   |
-parseHours()          &lt;- Extract days + time ranges + holiday info from each segment
+parseHours() body     &lt;- Extract days + time ranges + holiday info from each segment
   |
-Structured data: { schedule, holidaySchedule, holidayClosed }
+applyClosedDays()     &lt;- Conservatively remove closedDays from schedule
+  |                       (single multi-day entry only; ambiguous cases skipped)
   |
-getHoursInfo(raw, ctx) &lt;- Determine today's business status (considering holidays &amp; overnight hours)
-  |                        ctx = getJstContext() (compute JST date/time once per batch)
-  |                        isJapaneseHoliday() for holiday detection
+Structured data: { schedule, holidaySchedule, holidayClosed, closedDays, hoursNotes }
   |
-{ todayRanges, isOpen, isHoliday, holidayClosed, ... }
+getHoursInfo(raw, ctx) &lt;- Determine today's business status
+  |                        ctx = getJstContext(), isJapaneseHoliday()
   |
-renderHoursHtml(raw, info) &lt;- Generate HTML: badges + weekly schedule + holiday row
+{ todayRanges, isOpen, isHoliday, holidayClosed, hoursNotes, ... }
+  |
+renderHoursHtml(raw, info)
+  |  Badge + today's hours
+  |  Collapsible &quot;Full Schedule&quot;:
+  |    ※ Exclusion notes (amber stripe, above grid)
+  |    Weekly schedule grid + holiday row
+  |    ※ Please confirm with the facility
 </code></pre>
 <h2 id="normalizehourstext-why-75-rules">normalizeHoursText(): Why 75 Rules?</h2>
 <p>The purpose is to converge input text variations into "one canonical form." Each rule addresses a specific pattern found in real data.</p>
@@ -285,9 +299,59 @@ An additional rule was then needed to separate <code>月-金日</code> (Mon-FriS
   (Mon-Fri:9:00-18:00, holidays:9:00-12:00)
 </code></pre>
 <h4 id="5b-exclusion-information-extraction-inside-parsehours-before-normalization">5b: Exclusion Information Extraction (inside parseHours, before normalization)</h4>
-<p>Using the same approach as 5a, <code>parseHours()</code> extracts closed-day and exclusion information from <code>rawNorm</code> using 5 patterns (closed-day declarations, exclusion prefixes, parenthesized exclusions, closure suffixes, parenthesized closures) plus 3 ordinal/temporal note catchers.</p>
+<p>Using the same approach as 5a, <code>parseHours()</code> extracts closed-day and exclusion information from <code>rawNorm</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Target</th>
+<th>Example</th>
+<th>closedDays</th>
+<th>hoursNotes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A: Closed-day list</td>
+<td><code>定休日:水曜</code></td>
+<td><code>定休日 水</code></td>
+<td>Wed(3)</td>
+<td><code>定休日 水</code></td>
+</tr>
+<tr>
+<td>B: X-exclusion</td>
+<td><code>水を除く月-金</code></td>
+<td><code>水を除く</code></td>
+<td>Wed(3)</td>
+<td><code>水を除く</code></td>
+</tr>
+<tr>
+<td>C: Paren exclusion</td>
+<td><code>（除く水曜）</code></td>
+<td><code>除く水曜</code></td>
+<td>Wed(3)</td>
+<td><code>除く水曜</code></td>
+</tr>
+<tr>
+<td>D: X-closure</td>
+<td><code>水曜午後休診</code></td>
+<td><code>水曜午後休診</code></td>
+<td>—</td>
+<td><code>水曜午後休診</code></td>
+</tr>
+<tr>
+<td>E: Paren closure</td>
+<td><code>（木休診）</code></td>
+<td><code>木休診</code></td>
+<td>Thu(4)</td>
+<td><code>木休診</code></td>
+</tr>
+</tbody>
+</table>
+<p>Plus 3 ordinal/temporal note catchers (e.g., <code>第2日曜を除く</code> → notes only, no closedDays).</p>
+<p><strong>Classification</strong>: partial (AM/PM/time) → notes only. Day-only → closedDays + notes. Ordinal/temporal/compound → notes only (blocked by Pattern B negative lookbehinds).</p>
 <ul>
-<li><strong>closedDays</strong>: Unambiguous full-day closures. Applied conservatively to the schedule — only when the day appears in exactly one multi-day entry. Ambiguous cases (multi-entry, ordinal, temporal) are left in the schedule.</li>
+<li><strong>closedDays</strong>: Applied conservatively — only when the day appears in exactly one multi-day entry (e.g., removing Thu from Mon-Fri). If a day appears in multiple entries (which may have different hours), it is NOT removed.</li>
 <li><strong>hoursNotes</strong>: ALL exclusion info preserved as supplementary text, regardless of whether closedDays were applied. Displayed as amber-highlighted notes above the schedule grid.</li>
 </ul>
 <p>Principle: <strong>Never discard information.</strong> Notes are the primary communication; closedDays is the conservative optimization. (See DESIGN.md §6: "A parser is a mapping of reality. Information beyond the model's limits must be preserved outside the mapping.")</p>

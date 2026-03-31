@@ -81,6 +81,7 @@ This document specifies features to be added to the emergency contraceptive pill
 - Today's business status is highlighted (Open / Closed / Day off)
 - Full weekly schedule shown in a collapsible section
 - Unparseable entries (2.9%) display raw data as-is. See [HOURS_PARSER](HOURS_PARSER_EN.html) for design details
+- **Exclusion info preservation and display**: Closed-day, exclusion, and partial-closure info is extracted before normalization and shown as amber-highlighted notes above the schedule grid in the collapsible section. Unambiguous closures are also applied to the schedule (conservative rule). Design principle: **Correct > Correct + caveat > Unknown > Wrong** (see DESIGN.md §6)
 - Holiday support: national holidays (kokumin no shukujitsu) are determined by pure calculation; holiday closures and holiday-specific hours are displayed correctly
 - Late-night business hours (close > 24:00) with date-crossing logic
 - All entries include the note: "Please confirm business hours directly with the pharmacy"
