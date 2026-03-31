@@ -406,4 +406,4 @@ console.log(ok + "/" + total + " = " + (ok/total*100).toFixed(1) + "%");
 | c3a7f62 | 祝日対応（3層構造）、月曜始まり化 | 97.1% |
 | 85870b8 | holidayClosed regex拡張（125→137件）、深夜営業isOpen修正、double parse解消 | 97.1% |
 | d3091c7 | getJstContext() によるパフォーマンス改善 | 97.1% |
-| (次コミット) | 医療機関対応: AM/PM変換、午前午後、除く安全処理、括弧曜日、注記スキップ、parseTimeRange末尾許容 | 薬局98.2% / 医療機関88.3% |
+| 2cf05b5 | 医療機関対応: AM/PM変換、午前午後、除く安全処理、括弧曜日、注記スキップ、parseTimeRange末尾許容 | 薬局98.2% / 医療機関88.3% |
