@@ -272,7 +272,7 @@ An additional rule was then needed to separate <code>月-金日</code> (Mon-FriS
 </tbody>
 </table>
 <h3 id="phase-5-closed-day-and-holiday-information-extraction-and-removal">Phase 5: Closed-Day and Holiday Information Extraction and Removal</h3>
-<p><strong>Two-stage processing</strong>: With the addition of holiday support, this phase became a two-stage process: "extract then remove."</p>
+<p><strong>Three-stage processing</strong>: This phase follows "extract → extract → remove." Information is captured from raw text before normalization strips it.</p>
 <h4 id="5a-holiday-information-extraction-inside-parsehours-before-normalization">5a: Holiday Information Extraction (inside parseHours, before normalization)</h4>
 <p><code>parseHours()</code> extracts holiday-related information from the raw text <strong>before</strong> normalization:</p>
 <ol>
@@ -284,22 +284,25 @@ An additional rule was then needed to separate <code>月-金日</code> (Mon-FriS
 月-金:9:00-18:00,祝:9:00-12:00 → holidaySchedule = [{open:&quot;9:00&quot;, close:&quot;12:00&quot;}]
   (Mon-Fri:9:00-18:00, holidays:9:00-12:00)
 </code></pre>
-<h4 id="5b-closed-day-text-removal-inside-normalizehourstext">5b: Closed-Day Text Removal (inside normalizeHoursText)</h4>
-<p>After extraction, closed-day text is removed during the normalization pipeline. The day-of-week parser outputs <code>{days, open, close}</code> arrays and has no type to represent "closed." Leaving the text in causes parse failures that drag down otherwise-parseable business hours to raw-data display. By removing it, only business days are structured, and closed days are implicitly represented as "not in the schedule = closed."</p>
+<h4 id="5b-exclusion-information-extraction-inside-parsehours-before-normalization">5b: Exclusion Information Extraction (inside parseHours, before normalization)</h4>
+<p>Using the same approach as 5a, <code>parseHours()</code> extracts closed-day and exclusion information from <code>rawNorm</code> using 5 patterns (closed-day declarations, exclusion prefixes, parenthesized exclusions, closure suffixes, parenthesized closures) plus 3 ordinal/temporal note catchers.</p>
+<ul>
+<li><strong>closedDays</strong>: Unambiguous full-day closures. Applied conservatively to the schedule — only when the day appears in exactly one multi-day entry. Ambiguous cases (multi-entry, ordinal, temporal) are left in the schedule.</li>
+<li><strong>hoursNotes</strong>: ALL exclusion info preserved as supplementary text, regardless of whether closedDays were applied. Displayed as amber-highlighted notes above the schedule grid.</li>
+</ul>
+<p>Principle: <strong>Never discard information.</strong> Notes are the primary communication; closedDays is the conservative optimization. (See DESIGN.md §6: "A parser is a mapping of reality. Information beyond the model's limits must be preserved outside the mapping.")</p>
+<h4 id="5c-closed-day-text-removal-inside-normalizehourstext">5c: Closed-Day Text Removal (inside normalizeHoursText)</h4>
+<p>After extraction in 5a/5b, closed-day text is removed during the normalization pipeline. The day-of-week parser outputs <code>{days, open, close}</code> arrays and has no type to represent "closed." Leaving the text in causes parse failures that drag down otherwise-parseable business hours to raw-data display. By removing it, only business days are structured, and closed days are implicitly represented as "not in the schedule = closed." Since exclusion info is already preserved in 5b, no information is lost.</p>
 <pre><code>月-金:9:00-18:00,土日祝休み      → 月-金:9:00-18:00
   (Mon-Fri:..., Sat/Sun/holidays closed)
 月-金:9:00-18:00,日祝:定休       → 月-金:9:00-18:00
   (Mon-Fri:..., Sun/holidays: regular holiday)
-月-金:9:00-18:00,休:日祝         → 月-金:9:00-18:00
-  (Mon-Fri:..., closed: Sun/holidays)
-月-金:9:00-18:00 日              → 月-金:9:00-18:00
-  (Mon-Fri:... Sun — trailing bare day-of-week = closed)
-月-金:9:00-18:00,水日祝は        → 月-金:9:00-18:00
-  (Mon-Fri:..., Wed/Sun/holidays [closed])
+月-金:9:00-18:00(木曜日を除く)   → 月-金:9:00-18:00 (Thu in closedDays, note: &quot;木曜日を除く&quot;)
+  (Mon-Fri except Thu — exclusion info preserved in hoursNotes)
 </code></pre>
 <h3 id="phase-6-ordinal-day-nth-weekday-handling">Phase 6: Ordinal Day (Nth weekday) Handling</h3>
 <p><strong>Why skip</strong>: <code>第1・3土曜:9:00-12:00</code> (1st &amp; 3rd Sat: 9:00-12:00) means "open only on the 1st and 3rd Saturdays of the month." A weekly schedule (<code>{days, open, close}</code>) cannot represent "which week's which day."</p>
-<p>Initially, the plan was to "strip the ordinal and treat it as a regular weekday" (i.e., display as every Saturday). However, <strong>the user pointed out that this is incorrect — it changes the meaning of the information.</strong> Displaying "1st &amp; 3rd Saturday only" as "every Saturday" would cause people to visit on the 2nd, 4th, and 5th Saturdays. Since this information relates to medication access, <strong>missing information is better than wrong information</strong> — that was the design decision.</p>
+<p>Initially, the plan was to "strip the ordinal and treat it as a regular weekday" (i.e., display as every Saturday). However, <strong>the user pointed out that this is incorrect — it changes the meaning of the information.</strong> Displaying "1st &amp; 3rd Saturday only" as "every Saturday" would cause people to visit on the 2nd, 4th, and 5th Saturdays. Ordinal information is now preserved as supplementary notes (e.g., "※1st &amp; 3rd Sat only") rather than being silently discarded.</p>
 <p>During normalization:
 - Kanji numerals to Arabic: <code>第一土</code> (1st Sat) -&gt; <code>第1土</code>
 - Ordinal separator unification: <code>第1,3,5</code> / <code>第1.3.5</code> -&gt; <code>第1・3・5</code>

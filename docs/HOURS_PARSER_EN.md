@@ -123,7 +123,7 @@ Segment delimiters are similarly varied:
 
 ### Phase 5: Closed-Day and Holiday Information Extraction and Removal
 
-**Two-stage processing**: With the addition of holiday support, this phase became a two-stage process: "extract then remove."
+**Three-stage processing**: This phase follows "extract → extract → remove." Information is captured from raw text before normalization strips it.
 
 #### 5a: Holiday Information Extraction (inside parseHours, before normalization)
 
@@ -139,28 +139,33 @@ Segment delimiters are similarly varied:
   (Mon-Fri:9:00-18:00, holidays:9:00-12:00)
 ```
 
-#### 5b: Closed-Day Text Removal (inside normalizeHoursText)
+#### 5b: Exclusion Information Extraction (inside parseHours, before normalization)
 
-After extraction, closed-day text is removed during the normalization pipeline. The day-of-week parser outputs `{days, open, close}` arrays and has no type to represent "closed." Leaving the text in causes parse failures that drag down otherwise-parseable business hours to raw-data display. By removing it, only business days are structured, and closed days are implicitly represented as "not in the schedule = closed."
+Using the same approach as 5a, `parseHours()` extracts closed-day and exclusion information from `rawNorm` using 5 patterns (closed-day declarations, exclusion prefixes, parenthesized exclusions, closure suffixes, parenthesized closures) plus 3 ordinal/temporal note catchers.
+
+- **closedDays**: Unambiguous full-day closures. Applied conservatively to the schedule — only when the day appears in exactly one multi-day entry. Ambiguous cases (multi-entry, ordinal, temporal) are left in the schedule.
+- **hoursNotes**: ALL exclusion info preserved as supplementary text, regardless of whether closedDays were applied. Displayed as amber-highlighted notes above the schedule grid.
+
+Principle: **Never discard information.** Notes are the primary communication; closedDays is the conservative optimization. (See DESIGN.md §6: "A parser is a mapping of reality. Information beyond the model's limits must be preserved outside the mapping.")
+
+#### 5c: Closed-Day Text Removal (inside normalizeHoursText)
+
+After extraction in 5a/5b, closed-day text is removed during the normalization pipeline. The day-of-week parser outputs `{days, open, close}` arrays and has no type to represent "closed." Leaving the text in causes parse failures that drag down otherwise-parseable business hours to raw-data display. By removing it, only business days are structured, and closed days are implicitly represented as "not in the schedule = closed." Since exclusion info is already preserved in 5b, no information is lost.
 
 ```
 月-金:9:00-18:00,土日祝休み      → 月-金:9:00-18:00
   (Mon-Fri:..., Sat/Sun/holidays closed)
 月-金:9:00-18:00,日祝:定休       → 月-金:9:00-18:00
   (Mon-Fri:..., Sun/holidays: regular holiday)
-月-金:9:00-18:00,休:日祝         → 月-金:9:00-18:00
-  (Mon-Fri:..., closed: Sun/holidays)
-月-金:9:00-18:00 日              → 月-金:9:00-18:00
-  (Mon-Fri:... Sun — trailing bare day-of-week = closed)
-月-金:9:00-18:00,水日祝は        → 月-金:9:00-18:00
-  (Mon-Fri:..., Wed/Sun/holidays [closed])
+月-金:9:00-18:00(木曜日を除く)   → 月-金:9:00-18:00 (Thu in closedDays, note: "木曜日を除く")
+  (Mon-Fri except Thu — exclusion info preserved in hoursNotes)
 ```
 
 ### Phase 6: Ordinal Day (Nth weekday) Handling
 
 **Why skip**: `第1・3土曜:9:00-12:00` (1st & 3rd Sat: 9:00-12:00) means "open only on the 1st and 3rd Saturdays of the month." A weekly schedule (`{days, open, close}`) cannot represent "which week's which day."
 
-Initially, the plan was to "strip the ordinal and treat it as a regular weekday" (i.e., display as every Saturday). However, **the user pointed out that this is incorrect — it changes the meaning of the information.** Displaying "1st & 3rd Saturday only" as "every Saturday" would cause people to visit on the 2nd, 4th, and 5th Saturdays. Since this information relates to medication access, **missing information is better than wrong information** — that was the design decision.
+Initially, the plan was to "strip the ordinal and treat it as a regular weekday" (i.e., display as every Saturday). However, **the user pointed out that this is incorrect — it changes the meaning of the information.** Displaying "1st & 3rd Saturday only" as "every Saturday" would cause people to visit on the 2nd, 4th, and 5th Saturdays. Ordinal information is now preserved as supplementary notes (e.g., "※1st & 3rd Sat only") rather than being silently discarded.
 
 During normalization:
 - Kanji numerals to Arabic: `第一土` (1st Sat) -> `第1土`

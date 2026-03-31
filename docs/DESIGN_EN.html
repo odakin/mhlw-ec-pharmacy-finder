@@ -199,7 +199,7 @@ ul, ol { padding-left: 2em; }
 <li>In areas with few pharmacies, a "You can also search medical institutions" banner appears automatically, so guidance is functional</li>
 </ul>
 <h3 id="visual-distinction-of-cards">Visual Distinction of Cards</h3>
-<p>When pharmacies and medical institutions appear in mixed search results, users must be able to distinguish them at a glance. Medical institution cards feature a red left border + a "Medical Institution" (医療機関) label + a note: "An in-person consultation and prescription are required." On the map, pharmacies use blue pins and medical institutions use red pins.</p>
+<p>When pharmacies and medical institutions appear in mixed search results, users must be able to distinguish them at a glance. Medical institution cards feature a red left border + a "Medical Institution" (医療機関) label. On the map, pharmacies use blue pins and medical institutions use red pins.</p>
 <hr>
 <h2 id="5-geolocation-ux">5. Geolocation UX</h2>
 <p>Sorting by "nearest" requires the browser's geolocation, but we do not use the browser's standard <code>confirm()</code> dialog.</p>
@@ -214,7 +214,7 @@ ul, ol { padding-left: 2em; }
 <p>Geolocation is used solely for in-browser distance calculations and is never sent to a server. As a static site, there is no server to send it to.</p>
 <hr>
 <h2 id="6-hours-parser-philosophy">6. Hours Parser Philosophy</h2>
-<p>The MHLW data's <code>hours</code> field contains 6,933 distinct format variations. Rather than aiming for 100% parsing, we adopted a design of <strong>97% accurate parsing + 3% graceful fallback</strong>.</p>
+<p>The MHLW data's <code>hours</code> field contains thousands of distinct format variations. Rather than aiming for 100% parsing, we adopted a design of <strong>high-coverage accurate parsing + graceful fallback</strong>. Current coverage: pharmacies 98.2%, medical institutions 88.3%.</p>
 <h3 id="why-not-aim-for-100">Why Not Aim for 100%?</h3>
 <ul>
 <li>The remaining 3% consists of natural language patterns (e.g., "1st and 3rd Saturday mornings only") or data quality issues that are fundamentally beyond what regex-based parsers can handle</li>

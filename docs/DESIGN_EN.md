@@ -133,7 +133,7 @@ By default, only pharmacies (薬局) are displayed. Turning on the "Also show me
 
 ### Visual Distinction of Cards
 
-When pharmacies and medical institutions appear in mixed search results, users must be able to distinguish them at a glance. Medical institution cards feature a red left border + a "Medical Institution" (医療機関) label + a note: "An in-person consultation and prescription are required." On the map, pharmacies use blue pins and medical institutions use red pins.
+When pharmacies and medical institutions appear in mixed search results, users must be able to distinguish them at a glance. Medical institution cards feature a red left border + a "Medical Institution" (医療機関) label. On the map, pharmacies use blue pins and medical institutions use red pins.
 
 ---
 
@@ -157,7 +157,7 @@ Geolocation is used solely for in-browser distance calculations and is never sen
 
 ## 6. Hours Parser Philosophy
 
-The MHLW data's `hours` field contains 6,933 distinct format variations. Rather than aiming for 100% parsing, we adopted a design of **97% accurate parsing + 3% graceful fallback**.
+The MHLW data's `hours` field contains thousands of distinct format variations. Rather than aiming for 100% parsing, we adopted a design of **high-coverage accurate parsing + graceful fallback**. Current coverage: pharmacies 98.2%, medical institutions 88.3%.
 
 ### Why Not Aim for 100%?
 
