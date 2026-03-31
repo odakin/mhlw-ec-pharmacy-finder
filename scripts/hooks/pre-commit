@@ -13,3 +13,18 @@ if [ -n "$DOCS_CHANGED" ] && [ -z "$SESSION_CHANGED" ]; then
   echo ""
   exit 1
 fi
+
+# Block placeholder text in staged files
+PLACEHOLDERS='(次コミット)\|(next commit)\|(TBD)\|(TODO: commit)'
+FOUND=$(git diff --cached -S"$(echo "$PLACEHOLDERS" | head -1)" --name-only 2>/dev/null)
+# Use grep on staged content for reliable multi-pattern matching
+FOUND=$(git diff --cached -- . | grep -i '^\+.*\((次コミット)\|(next commit)\)' | head -5)
+if [ -n "$FOUND" ]; then
+  echo ""
+  echo "⚠️  プレースホルダーが残っています:"
+  echo "$FOUND"
+  echo ""
+  echo "   コミットハッシュに置き換えてからコミットしてください。"
+  echo ""
+  exit 1
+fi
