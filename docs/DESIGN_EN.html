@@ -89,7 +89,7 @@ ul, ol { padding-left: 2em; }
 <p>The medical institution data includes a "stock availability" (常時在庫の有無) column from the MHLW PDF. Facilities marked "No" or "Unknown" are hidden by default.</p>
 <ul>
 <li><strong>Source</strong>: The facility itself reported "not regularly stocked" to MHLW (primary source)</li>
-<li><strong>Alternatives</strong>: Facilities without stock require an in-person consultation followed by an external prescription — the patient then goes to a pharmacy (薬局). Over 10,000 pharmacies are already listed, so there is no information loss</li>
+<li><strong>Alternatives</strong>: Facilities without stock require an in-person consultation followed by an external prescription — the patient then goes to a pharmacy (薬局). Over 11,000 pharmacies are already listed, so there is no information loss</li>
 <li><strong>Harm of not excluding</strong>: Risk of wasted trips to facilities that have reported they do not regularly stock the medication</li>
 </ul>
 <blockquote>
@@ -134,7 +134,7 @@ ul, ol { padding-left: 2em; }
 </ul>
 <p>→ This is not even a filter — it is a <strong>data quality issue</strong>. There is no reason to display these.</p>
 <h3 id="count-display-design">Count Display Design</h3>
-<p>Exclusion reduces <code>data.json</code> to 9,951 records, but MHLW officially publishes 10,128. These two numbers have different meanings:</p>
+<p>Exclusion reduces <code>data.json</code> to fewer records than MHLW's published total. These two numbers have different meanings (as of 2026-03-25):</p>
 <table>
 <thead>
 <tr>
@@ -145,14 +145,14 @@ ul, ol { padding-left: 2em; }
 </thead>
 <tbody>
 <tr>
-<td><strong>10,128</strong></td>
+<td><strong>11,931</strong></td>
 <td>Facilities published by MHLW (data coverage)</td>
-<td>Highlight card: "💊 10,128 nationwide"</td>
+<td>Highlight card: "💊 11,931 nationwide"</td>
 </tr>
 <tr>
-<td><strong>9,951</strong></td>
+<td><strong>11,734</strong></td>
 <td>Actually searchable facilities (what users can interact with)</td>
-<td>Status bar: "Loaded 9,951 pharmacy records"</td>
+<td>Status bar: "Loaded 11,734 pharmacy records"</td>
 </tr>
 </tbody>
 </table>
@@ -164,7 +164,7 @@ ul, ol { padding-left: 2em; }
 <li><strong><code>app.js</code> (init)</strong>: <code>!rr.addr</code> as a defensive filter (safety net against direct data.json edits)</li>
 <li><strong><code>app.js</code> (highlight)</strong>: <code>META.totalPublished || DATA.length</code> — falls back gracefully for older data without totalPublished</li>
 </ul>
-<p>The title/meta text "全国10,000件以上" (over 10,000 nationwide) is an approximate expression referencing the MHLW dataset size and is unaffected by the exclusion.</p>
+<p>The title/meta approximate count (e.g., "over 11,000 nationwide") references the MHLW dataset size and is unaffected by the exclusion.</p>
 <hr>
 <h2 id="4-pharmacy-default-with-medical-institution-toggle">4. Pharmacy-Default with Medical Institution Toggle</h2>
 <p>By default, only pharmacies (薬局) are displayed. Turning on the "Also show medical institutions with stock" toggle lazy-loads <code>clinics.json</code> and integrates the results.</p>

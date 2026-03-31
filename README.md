@@ -164,7 +164,7 @@ A search tool for pharmacies and medical institutions in Japan that provide emer
 
 ## Features
 
-- **10,000+ pharmacies + 2,900+ medical institutions** across all 47 prefectures
+- **11,000+ pharmacies + 3,000+ medical institutions** across all 47 prefectures
 - **Map view** with marker clustering (Leaflet.js + OpenStreetMap; pharmacies in blue, clinics in red)
 - **Sort by nearest** using browser geolocation (unified sort across pharmacies and clinics)
 - **Business hours** display with today's status highlighted (including national holiday detection)

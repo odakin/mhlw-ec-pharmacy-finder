@@ -39,7 +39,7 @@ Emergency contraception is time-critical. The decision to hide options by defaul
 The medical institution data includes a "stock availability" (常時在庫の有無) column from the MHLW PDF. Facilities marked "No" or "Unknown" are hidden by default.
 
 - **Source**: The facility itself reported "not regularly stocked" to MHLW (primary source)
-- **Alternatives**: Facilities without stock require an in-person consultation followed by an external prescription — the patient then goes to a pharmacy (薬局). Over 10,000 pharmacies are already listed, so there is no information loss
+- **Alternatives**: Facilities without stock require an in-person consultation followed by an external prescription — the patient then goes to a pharmacy (薬局). Over 11,000 pharmacies are already listed, so there is no information loss
 - **Harm of not excluding**: Risk of wasted trips to facilities that have reported they do not regularly stock the medication
 
 > Primary source + alternatives available + practical benefit of noise removal. Exclusion is justified.
@@ -91,12 +91,12 @@ Evaluated against the 3-axis framework from Section 2:
 
 ### Count Display Design
 
-Exclusion reduces `data.json` to 9,951 records, but MHLW officially publishes 10,128. These two numbers have different meanings:
+Exclusion reduces `data.json` to fewer records than MHLW's published total. These two numbers have different meanings (as of 2026-03-25):
 
 | Number | Meaning | Displayed where |
 |---|---|---|
-| **10,128** | Facilities published by MHLW (data coverage) | Highlight card: "💊 10,128 nationwide" |
-| **9,951** | Actually searchable facilities (what users can interact with) | Status bar: "Loaded 9,951 pharmacy records" |
+| **11,931** | Facilities published by MHLW (data coverage) | Highlight card: "💊 11,931 nationwide" |
+| **11,734** | Actually searchable facilities (what users can interact with) | Status bar: "Loaded 11,734 pharmacy records" |
 
 The highlight card states "Complete official MHLW data." The number shown there should be the MHLW dataset size, not our filtered count. Hence it uses `meta.totalPublished`.
 
@@ -108,7 +108,7 @@ The status bar is an operational report from the search engine — it accurately
 - **`app.js` (init)**: `!rr.addr` as a defensive filter (safety net against direct data.json edits)
 - **`app.js` (highlight)**: `META.totalPublished || DATA.length` — falls back gracefully for older data without totalPublished
 
-The title/meta text "全国10,000件以上" (over 10,000 nationwide) is an approximate expression referencing the MHLW dataset size and is unaffected by the exclusion.
+The title/meta approximate count (e.g., "over 11,000 nationwide") references the MHLW dataset size and is unaffected by the exclusion.
 
 ---
 

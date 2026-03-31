@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document specifies features to be added to the emergency contraceptive pill (EC) pharmacy finder site: https://odakin.github.io/mhlw-ec-pharmacy-finder/. The goal is to close the gap with competing sites (e.g., EPARK Kusuri no Madoguchi https://www.kusurinomadoguchi.com/s?is_ecp=1) while preserving existing strengths (10,000+ pharmacies from official MHLW data, female pharmacist filter, no-appointment-needed filter, etc.).
+This document specifies features to be added to the emergency contraceptive pill (EC) pharmacy finder site: https://odakin.github.io/mhlw-ec-pharmacy-finder/. The goal is to close the gap with competing sites (e.g., EPARK Kusuri no Madoguchi https://www.kusurinomadoguchi.com/s?is_ecp=1) while preserving existing strengths (11,000+ pharmacies from official MHLW data, female pharmacist filter, no-appointment-needed filter, etc.).
 
 **Constraints**:
 - Static hosting on GitHub Pages. No server-side processing

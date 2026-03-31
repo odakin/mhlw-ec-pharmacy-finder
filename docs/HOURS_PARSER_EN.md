@@ -4,7 +4,7 @@
 
 ### Root Cause: Free-Text Data from MHLW
 
-The `hours` field in the MHLW (Ministry of Health, Labour and Welfare) pharmacy dataset (10,128 records) is **free-form text**. There is no standardized format specified; each prefecture and pharmacy enters data in its own way. The same schedule "Mon-Fri 9:00-18:00" can be written in thousands of different ways.
+The `hours` field in the MHLW (Ministry of Health, Labour and Welfare) pharmacy dataset (11,000+ records) is **free-form text**. There is no standardized format specified; each prefecture and pharmacy enters data in its own way. The same schedule "Mon-Fri 9:00-18:00" can be written in thousands of different ways.
 
 ### The Simple Approach We Tried First
 
@@ -16,7 +16,7 @@ Each time a new rule was added, cases were discovered where it interfered with e
 
 ### The Complexity in Numbers
 
-- Out of 9,951 records (non-empty hours), there are approximately 6,933 unique formats
+- Out of 11,734 records (non-empty hours), there are thousands of unique formats
 - `normalizeHoursText` alone has 75 `.replace()` calls (~156 lines)
 - The entire parser (normalization through rendering) is ~590 lines with ~150 regex patterns
 - The result: pharmacy 98.2% coverage (9,768 parseable), clinic 88.3% coverage (2,739 parseable). Remaining failures are natural language, URLs, or bad data

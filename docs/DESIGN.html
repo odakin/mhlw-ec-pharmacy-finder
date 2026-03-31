@@ -89,7 +89,7 @@ ul, ol { padding-left: 2em; }
 <p>医療機関データには厚労省PDFの「常時在庫の有無」列がある。「無」「不明」はデフォルトで非表示としている。</p>
 <ul>
 <li><strong>情報の出所</strong>: 施設自身が「常備していない」と厚労省に回答（一次情報）</li>
-<li><strong>代替</strong>: 在庫なし施設は診察後に院外処方→薬局へ。薬局は10,000件掲載済みで情報損失なし</li>
+<li><strong>代替</strong>: 在庫なし施設は診察後に院外処方→薬局へ。薬局は11,000件超掲載済みで情報損失なし</li>
 <li><strong>除外しない場合の害</strong>: 「常備していない」施設に期待して行く無駄足リスク</li>
 </ul>
 <p>→ 一次情報 + 代替あり + ノイズ除去の実益。除外は妥当。</p>
@@ -130,7 +130,7 @@ ul, ol { padding-left: 2em; }
 </ul>
 <p>→ フィルターですらなく、<strong>データ品質の問題</strong>。表示しない判断に迷う余地がない。</p>
 <h3 id="_7">件数表示の設計</h3>
-<p>除外により <code>data.json</code> の件数は9,951件になるが、厚労省が公表しているのは10,128件。この2つの数字はそれぞれ別の意味を持つ:</p>
+<p>除外により <code>data.json</code> の件数は厚労省公表件数より少なくなる。この2つの数字はそれぞれ別の意味を持つ（2026-03-25時点の例）:</p>
 <table>
 <thead>
 <tr>
@@ -141,14 +141,14 @@ ul, ol { padding-left: 2em; }
 </thead>
 <tbody>
 <tr>
-<td><strong>10,128</strong></td>
+<td><strong>11,931</strong></td>
 <td>厚労省が公表した施設数（データの網羅性）</td>
-<td>ハイライトカード「💊 全国 10,128 件」</td>
+<td>ハイライトカード「💊 全国 11,931 件」</td>
 </tr>
 <tr>
-<td><strong>9,951</strong></td>
+<td><strong>11,734</strong></td>
 <td>実際に検索可能な施設数（ユーザーが触れるデータ）</td>
-<td>ステータスバー「9,951件の薬局データを読み込みました」</td>
+<td>ステータスバー「11,734件の薬局データを読み込みました」</td>
 </tr>
 </tbody>
 </table>
@@ -160,7 +160,7 @@ ul, ol { padding-left: 2em; }
 <li><strong><code>app.js</code>（init）</strong>: <code>!rr.addr</code> で防御フィルター（data.json 直編集等への安全策）</li>
 <li><strong><code>app.js</code>（ハイライト）</strong>: <code>META.totalPublished || DATA.length</code> で表示。totalPublished がない古いデータでもフォールバック</li>
 </ul>
-<p>title / meta の「全国10,000件以上」は厚労省データの規模を参照した概数表現であり、除外の影響を受けない。</p>
+<p>title / meta の概数表現（「全国11,000件以上」等）は厚労省データの規模を参照しており、除外の影響を受けない。</p>
 <hr>
 <h2 id="4">4. 薬局デフォルト・医療機関トグル方式</h2>
 <p>デフォルトは薬局のみ表示。「常時在庫ありの医療機関も表示」トグルをONにすると <code>clinics.json</code> を遅延読み込みして結果に統合する。</p>
