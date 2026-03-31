@@ -308,7 +308,7 @@ An additional rule was then needed to separate <code>月-金日</code> (Mon-FriS
 - <code>土(第1-3):8:30-18:00</code> (Sat (1st-3rd):...) -&gt; skip Sat (ordinal-limited, not weekly)
 - <code>水・土(第1・3・4):9:00-13:00</code> (Wed + Sat(1st,3rd,4th):...) -&gt; keep only Wed, skip Sat(1st,3rd,4th)
 - <code>月-金,第1・3・5土:9:00-19:00</code> (Mon-Fri, 1st/3rd/5th Sat:...) -&gt; keep only Mon-Fri, skip ordinal Sat</p>
-<p><strong>Design decision</strong>: Missing information is acceptable, but <strong>displaying incorrect information is not</strong>. It is better for Saturday information to be absent than to mislead users into thinking "this pharmacy is open on Saturdays."</p>
+<p><strong>Design decision</strong>: <strong>Correct &gt; Correct + caveat &gt; Unknown &gt; Wrong</strong> (see DESIGN.md §6). Showing "open every Saturday" when only specific Saturdays apply would be Wrong. Instead, ordinal info is preserved as supplementary notes (e.g., "※1st &amp; 3rd Sat only").</p>
 <h2 id="splithourssegments-why-simple-split-doesnt-work">splitHoursSegments(): Why Simple Split Doesn't Work</h2>
 <p><strong>Initially it was just <code>.split(",")</code>.</strong> But since the meaning of commas changes with context, simple splitting broke in many cases:</p>
 <ol>

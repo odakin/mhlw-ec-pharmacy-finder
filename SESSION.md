@@ -129,6 +129,7 @@
    - applyClosedDays: conservative rule（1エントリ+多曜日のみ適用、multi-entry は notes のみ）
    - 全除外情報を hoursNotes に集約（closedDays 適用の有無にかかわらず注記表示、ノイズフィルタ付き）
    - 注記表示をグリッドの上に移動、amber 背景ストリップで視認性向上
+   - 設計原則を改訂: 旧「Missing info > Wrong info」→ 新「**Correct > Correct + caveat > Unknown > Wrong**」。除外情報の廃棄は Missing ではなく Wrong（誤った営業日の積極的表示）だった。DESIGN.md §6、HOURS_PARSER.md Phase 5-6 を更新
 
 ## 残タスク
 

@@ -172,7 +172,7 @@ During parseHours:
 - `水・土(第1・3・4):9:00-13:00` (Wed + Sat(1st,3rd,4th):...) -> keep only Wed, skip Sat(1st,3rd,4th)
 - `月-金,第1・3・5土:9:00-19:00` (Mon-Fri, 1st/3rd/5th Sat:...) -> keep only Mon-Fri, skip ordinal Sat
 
-**Design decision**: Missing information is acceptable, but **displaying incorrect information is not**. It is better for Saturday information to be absent than to mislead users into thinking "this pharmacy is open on Saturdays."
+**Design decision**: **Correct > Correct + caveat > Unknown > Wrong** (see DESIGN.md §6). Showing "open every Saturday" when only specific Saturdays apply would be Wrong. Instead, ordinal info is preserved as supplementary notes (e.g., "※1st & 3rd Sat only").
 
 ## splitHoursSegments(): Why Simple Split Doesn't Work
 
