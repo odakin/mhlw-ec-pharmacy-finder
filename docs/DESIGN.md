@@ -391,16 +391,13 @@ HTML の `<details>` と JSON-LD の `FAQPage` は **同じ4問を同じ順序**
 | 「詳細を見る」で別モーダルを開く | カード表示と同じ情報量ならモーダルを作る必要はない。遷移が一段増えるだけ |
 | ポップアップにツールチップで追加情報 | 時間外情報は「隠してよい情報」ではなく、クリティカルな一次情報 |
 
-### 実装方針（defer、TODO として SESSION.md 管理）
+### 実装（2026-04-09、un-defer して実装済み）
 
-- 地図↔リスト切替の現行実装（`app.js` のビュー切替）を再利用し、切替時に対象 ID を URL フラグメントまたは state に渡す
-- 対象カードへは `scrollIntoView({block: 'center'})` + 一時的な CSS クラス付与でハイライト
-- ポップアップ全体がクリッカブルだと Leaflet のドラッグと競合する可能性があるため、ポップアップ内に明示的なリンク（例: 「このお店の詳細 →」）を置く方向で検討
-
-### un-defer トリガー
-
-- 時間外対応電話番号が必要になるケース（夜間・休日の緊急避妊薬アクセス）で、現状の地図 UI では情報にたどり着けないという具体的な report が発生した時
-- または、FEATURE_SPEC 側で地図 UI の改善をまとめて実施する際に同時着手
+- ポップアップ内に明示的な「このお店の詳細 →」リンク（`<a class="popup-jump" data-jump-id="...">`）を配置。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず
+- リストカード `<li>` に `data-id` を付与し、`jumpToCardFromMap(id)` が `CURRENT_ROWS` から対象を引いて対応カードへジャンプ
+- 対象カードが `CURRENT_LIMIT` 外にあるとき（「さらに N 件表示」前）は、必要な分だけ `RESULTS_STEP` の倍数で limit を拡張して再描画してから `scrollIntoView({block: 'center'})`
+- 一時的な CSS クラス `.jump-highlight`（`@keyframes jump-flash`, 2 秒）で該当カードをフラッシュさせて視認性を担保
+- Leaflet ポップアップはクリックイベントを document まで bubble させる（`disableClickPropagation` は mousedown/touchstart 系のみ）ため、`document.addEventListener('click', ...)` のグローバル委譲で受けられる。`initMap()` 内ではなくファイルスコープで 1 度だけ登録
 
 ---
 

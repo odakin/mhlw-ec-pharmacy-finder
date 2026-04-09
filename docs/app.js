@@ -1232,7 +1232,8 @@ function updateMap(rows) {
       ${escapeHtml(r.addr)}<br>
       ${r.tel ? `📞 <a href="tel:${escapeHtml(r.tel)}">${escapeHtml(r.tel)}</a><br>` : ""}
       ${r.hours ? `🕐 ${escapeHtml(r.hours)}<br>` : ""}
-      <a href="${gmapUrl}" target="_blank" rel="noopener">📍 Google Mapで見る</a>`;
+      <a href="${gmapUrl}" target="_blank" rel="noopener">📍 Google Mapで見る</a><br>
+      <a href="#" class="popup-jump" data-jump-id="${escapeHtml(String(r.id))}">このお店の詳細 →</a>`;
 
     const markerOpts = {};
     if (r._isClinic) {
@@ -1307,6 +1308,44 @@ function switchView(mode) {
   }
 }
 
+// Jump from map popup to the corresponding list card.
+// Used by the "このお店の詳細 →" link in Leaflet popups (event-delegated below).
+function jumpToCardFromMap(id) {
+  const targetIdx = CURRENT_ROWS.findIndex((r) => String(r.id) === String(id));
+  if (targetIdx < 0) return; // filtered out or stale — nothing to do
+
+  if (MAP) MAP.closePopup();
+  switchView("list");
+
+  // Expand the paged limit if the target is beyond it.
+  if (targetIdx >= CURRENT_LIMIT) {
+    CURRENT_LIMIT = Math.min(
+      Math.ceil((targetIdx + 1) / RESULTS_STEP) * RESULTS_STEP,
+      CURRENT_ROWS.length
+    );
+    renderResults(CURRENT_ROWS, CURRENT_LIMIT, true);
+  }
+
+  // Defer scroll/highlight to after the view switch layout settles.
+  setTimeout(() => {
+    const li = document.querySelector(`#list li[data-id="${CSS.escape(String(id))}"]`);
+    if (!li) return;
+    li.scrollIntoView({ behavior: "smooth", block: "center" });
+    li.classList.add("jump-highlight");
+    setTimeout(() => li.classList.remove("jump-highlight"), 2000);
+  }, 50);
+}
+
+// Event delegation: popup HTML is injected by Leaflet into a container that
+// isn't present at initMap() time, so we listen on document once.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest && e.target.closest("a.popup-jump");
+  if (!a) return;
+  e.preventDefault();
+  const id = a.dataset.jumpId;
+  if (id) jumpToCardFromMap(id);
+});
+
 // ── Rendering ──
 
 function getPager() {
@@ -1345,6 +1384,7 @@ function renderResults(rows, limit = RESULTS_STEP, updateStatus = true, pharmacy
 
   for (const r of show) {
     const li = document.createElement("li");
+    li.dataset.id = String(r.id);
     const isClinic = r._isClinic;
     const title = escapeHtml(r.name || "(名称不明)");
     const place = escapeHtml([r.pref, r.muni].filter(Boolean).join(" "));

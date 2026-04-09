@@ -1,12 +1,20 @@
 # SESSION.md — mhlw-ec-pharmacy-finder
 
-## 現在の状態（2026-03-31）
+## 現在の状態（2026-04-09）
 
 **全機能実装済み・運用中。**
 
 ## TODO
 
-- **地図のポップアップからリスト詳細へのジャンプ機能** (defer): 地図表示ではポップアップに簡易データしか出ない（特に時間外対応電話番号 `afterHoursTel` が欠落）ため、ピンをクリックして表示される吹き出しをクリックすると、リスト表示の詳しいカード（全項目表示）に飛ぶ導線を実装する。設計判断・代替案・un-defer トリガーは `docs/DESIGN.md` §11 を参照
+（なし）
+
+## 2026-04-09 追加: 地図ポップアップ → リストカード ジャンプ導線
+
+DESIGN.md §11 の defer を un-defer して実装。Leaflet ポップアップに「このお店の詳細 →」リンクを追加し、クリックでリスト表示に切替 + 該当カードへ `scrollIntoView` + 一時ハイライト（`.jump-highlight`, 2 秒）。
+
+- 実装ファイル: `docs/app.js`（`jumpToCardFromMap`, 受け取り側の `li` に `data-id`, document への委譲リスナー）、`docs/style.css`（`@keyframes jump-flash`）
+- ページネーションで対象カードが `CURRENT_LIMIT` 外にある場合は、必要な分だけ `RESULTS_STEP` の倍数で limit を拡張して再描画してからスクロール
+- Leaflet の `disableClickPropagation` は mousedown/touchstart 系のみで click は通すので、document レベルのイベント委譲で受け取り可能
 
 ### データ概況
 

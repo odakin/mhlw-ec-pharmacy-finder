@@ -446,7 +446,55 @@ ul, ol { padding-left: 2em; }
 <h3 id="json-ld">構造化データ（JSON-LD）との対応</h3>
 <p>HTML の <code>&lt;details&gt;</code> と JSON-LD の <code>FAQPage</code> は <strong>同じ4問を同じ順序</strong> で持つ。JSON-LD 側の質問文には「緊急避妊薬」を含め、検索エンジンが文脈なしで理解できるようにする（HTML側はページ文脈があるので省略可）。</p>
 <hr>
-<h2 id="_28">関連ドキュメント</h2>
+<h2 id="11">11. 地図ポップアップは簡易表示、詳細はリストカードに委譲する</h2>
+<h3 id="_28">問題</h3>
+<p>地図ビューでピンをクリックして表示される Leaflet のポップアップは、表示領域が狭く、かつ markercluster の展開状態に左右されるため、<strong>全項目を詰め込むと可読性が崩壊する</strong>。一方で、緊急避妊薬の利用者にとってクリティカルな項目（特に <code>afterHoursTel</code> = 時間外対応電話番号、<code>callAhead</code> = 事前連絡要否、<code>notes</code> = 備考）は省略できない。</p>
+<h3 id="_29">決定: ポップアップは簡易データのみ、吹き出しクリックでリストカードへジャンプ</h3>
+<ul>
+<li>ポップアップには名称・住所・電話・Google Map リンクなどの <strong>識別に必要な最小セット</strong> のみ表示する（現状通り）</li>
+<li>ポップアップ全体（または明示的な「詳細を見る」リンク）をクリックすると、リスト表示に切り替わり、<strong>該当レコードのカードへスクロール + 一時的にハイライト</strong> する動線を追加する</li>
+<li>詳細データ（<code>afterHoursTel</code>, <code>callAhead</code>, <code>notes</code>, 営業時間全曜日展開, 薬剤師人数など）は<strong>リストカード側の責務</strong>として集約する。ポップアップに同じものを重複実装しない</li>
+</ul>
+<h3 id="_30">なぜポップアップを拡張せず、リスト側に委譲するか</h3>
+<ul>
+<li><strong>単一の情報源:</strong> 詳細カードのレイアウトは既に安定しており、ポップアップ版を別途作ると項目追加のたびに 2 箇所メンテが必要になる</li>
+<li><strong>可読性:</strong> 狭いポップアップに時間外情報まで詰め込むと、特に医療機関の長い備考で破綻する</li>
+<li><strong>モバイル UX:</strong> スマホではポップアップ内スクロールは操作性が悪い。フルスクリーンのリストカードに遷移したほうが読みやすい</li>
+<li><strong>検索・絞り込みとの整合:</strong> リストに飛べば、そのまま隣接カードの比較・再検索に自然につながる</li>
+</ul>
+<h3 id="_31">却下した代替案</h3>
+<table>
+<thead>
+<tr>
+<th>案</th>
+<th>却下理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ポップアップに全項目を詰め込む</td>
+<td>可読性崩壊、2 箇所メンテ、モバイル NG</td>
+</tr>
+<tr>
+<td>「詳細を見る」で別モーダルを開く</td>
+<td>カード表示と同じ情報量ならモーダルを作る必要はない。遷移が一段増えるだけ</td>
+</tr>
+<tr>
+<td>ポップアップにツールチップで追加情報</td>
+<td>時間外情報は「隠してよい情報」ではなく、クリティカルな一次情報</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2026-04-09un-defer">実装（2026-04-09、un-defer して実装済み）</h3>
+<ul>
+<li>ポップアップ内に明示的な「このお店の詳細 →」リンク（<code>&lt;a class="popup-jump" data-jump-id="..."&gt;</code>）を配置。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず</li>
+<li>リストカード <code>&lt;li&gt;</code> に <code>data-id</code> を付与し、<code>jumpToCardFromMap(id)</code> が <code>CURRENT_ROWS</code> から対象を引いて対応カードへジャンプ</li>
+<li>対象カードが <code>CURRENT_LIMIT</code> 外にあるとき（「さらに N 件表示」前）は、必要な分だけ <code>RESULTS_STEP</code> の倍数で limit を拡張して再描画してから <code>scrollIntoView({block: 'center'})</code></li>
+<li>一時的な CSS クラス <code>.jump-highlight</code>（<code>@keyframes jump-flash</code>, 2 秒）で該当カードをフラッシュさせて視認性を担保</li>
+<li>Leaflet ポップアップはクリックイベントを document まで bubble させる（<code>disableClickPropagation</code> は mousedown/touchstart 系のみ）ため、<code>document.addEventListener('click', ...)</code> のグローバル委譲で受けられる。<code>initMap()</code> 内ではなくファイルスコープで 1 度だけ登録</li>
+</ul>
+<hr>
+<h2 id="_32">関連ドキュメント</h2>
 <ul>
 <li><a href="FEATURE_SPEC.html">機能仕様書</a> — 4機能の要件と技術方針</li>
 <li><a href="HOURS_PARSER.html">営業時間パーサー設計</a> — 多段正規化パイプラインの詳細設計</li>
