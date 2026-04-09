@@ -1228,12 +1228,13 @@ function updateMap(rows) {
 
     const gmapQ = encodeURIComponent((r.name || "") + " " + (r.addr || ""));
     const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${gmapQ}`;
+    const jumpLabel = r._isClinic ? "この医療機関の詳細 →" : "この薬局の詳細 →";
     const popup = `<strong>${escapeHtml(r.name)}</strong><br>
       ${escapeHtml(r.addr)}<br>
       ${r.tel ? `📞 <a href="tel:${escapeHtml(r.tel)}">${escapeHtml(r.tel)}</a><br>` : ""}
       ${r.hours ? `🕐 ${escapeHtml(r.hours)}<br>` : ""}
       <a href="${gmapUrl}" target="_blank" rel="noopener">📍 Google Mapで見る</a><br>
-      <a href="#" class="popup-jump" data-jump-id="${escapeHtml(String(r.id))}">このお店の詳細 →</a>`;
+      <a href="#" class="popup-jump" data-jump-id="${escapeHtml(String(r.id))}">${jumpLabel}</a>`;
 
     const markerOpts = {};
     if (r._isClinic) {
@@ -1309,7 +1310,7 @@ function switchView(mode) {
 }
 
 // Jump from map popup to the corresponding list card.
-// Used by the "このお店の詳細 →" link in Leaflet popups (event-delegated below).
+// Used by the "この薬局/医療機関の詳細 →" link in Leaflet popups (event-delegated below).
 function jumpToCardFromMap(id) {
   const targetIdx = CURRENT_ROWS.findIndex((r) => String(r.id) === String(id));
   if (targetIdx < 0) return; // filtered out or stale — nothing to do

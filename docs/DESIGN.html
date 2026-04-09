@@ -487,7 +487,7 @@ ul, ol { padding-left: 2em; }
 </table>
 <h3 id="2026-04-09un-defer">実装（2026-04-09、un-defer して実装済み）</h3>
 <ul>
-<li>ポップアップ内に明示的な「このお店の詳細 →」リンク（<code>&lt;a class="popup-jump" data-jump-id="..."&gt;</code>）を配置。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず</li>
+<li>ポップアップ内に明示的な「この薬局の詳細 →」/「この医療機関の詳細 →」リンク（<code>&lt;a class="popup-jump" data-jump-id="..."&gt;</code>）を配置。薬局/医療機関は <code>r._isClinic</code> で分岐。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず</li>
 <li>リストカード <code>&lt;li&gt;</code> に <code>data-id</code> を付与し、<code>jumpToCardFromMap(id)</code> が <code>CURRENT_ROWS</code> から対象を引いて対応カードへジャンプ</li>
 <li>対象カードが <code>CURRENT_LIMIT</code> 外にあるとき（「さらに N 件表示」前）は、必要な分だけ <code>RESULTS_STEP</code> の倍数で limit を拡張して再描画してから <code>scrollIntoView({block: 'center'})</code></li>
 <li>一時的な CSS クラス <code>.jump-highlight</code>（<code>@keyframes jump-flash</code>, 2 秒）で該当カードをフラッシュさせて視認性を担保</li>

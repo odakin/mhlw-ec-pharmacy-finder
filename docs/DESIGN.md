@@ -393,7 +393,7 @@ HTML の `<details>` と JSON-LD の `FAQPage` は **同じ4問を同じ順序**
 
 ### 実装（2026-04-09、un-defer して実装済み）
 
-- ポップアップ内に明示的な「このお店の詳細 →」リンク（`<a class="popup-jump" data-jump-id="...">`）を配置。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず
+- ポップアップ内に明示的な「この薬局の詳細 →」/「この医療機関の詳細 →」リンク（`<a class="popup-jump" data-jump-id="...">`）を配置。薬局/医療機関は `r._isClinic` で分岐。ポップアップ全体クリッカブル化は Leaflet のドラッグ・クラスタ展開と競合する恐れがあるため採用せず
 - リストカード `<li>` に `data-id` を付与し、`jumpToCardFromMap(id)` が `CURRENT_ROWS` から対象を引いて対応カードへジャンプ
 - 対象カードが `CURRENT_LIMIT` 外にあるとき（「さらに N 件表示」前）は、必要な分だけ `RESULTS_STEP` の倍数で limit を拡張して再描画してから `scrollIntoView({block: 'center'})`
 - 一時的な CSS クラス `.jump-highlight`（`@keyframes jump-flash`, 2 秒）で該当カードをフラッシュさせて視認性を担保
