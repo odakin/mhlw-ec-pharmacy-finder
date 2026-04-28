@@ -27,7 +27,10 @@ scripts/
   update_clinics.py      → 医療機関PDFパース → clinics.json 生成
   geocode.py             → 東大CSIS APIでジオコーディング（薬局+医療機関の住所→緯度経度）
   build_docs.py          → docs/*.md → docs/*.html 静的ビルド（SEO対策）
-  hooks/pre-commit       → SESSION.md 更新漏れ防止フック
+  hooks/pre-commit       → claude-config の public-precommit-runner.sh を呼ぶ stub (Tier A/B leak gate)
+.claude/
+  public-repo.marker     → leak gate の visibility 宣言 (claude-config DESIGN §公開リポ leak 防止)
+  pre-commit-extra.sh    → leak gate を pass 後に runner が chain する repo 固有 guard (placeholder 検出 + docs↔SESSION.md 同期警告)
 line_bot/                → LINE Bot サンプル
 AGENTS.md                → コードレビューガイドライン
 docs/FEATURE_SPEC.md     → 機能仕様書（4機能の要件・技術方針、GitHub Pages で公開）
@@ -126,7 +129,9 @@ docs/HOURS_PARSER.md     → 営業時間パーサー設計ドキュメント（
 git config core.hooksPath scripts/hooks
 ```
 
-これで `scripts/hooks/pre-commit`（docs/ 変更時に SESSION.md 更新を促すフック）が有効になる。
+これで `scripts/hooks/pre-commit` (claude-config の `public-precommit-runner.sh` を呼ぶ stub) が有効化される。runner は Tier A/B leak gate を実行後、`.claude/pre-commit-extra.sh` (placeholder 検出 + docs↔SESSION.md 同期警告) を chain する。
+
+**前提**: `~/Claude/claude-config/` が clone されていること (stub が absolute path で参照する)。`claude-config/setup.sh` を一度走らせていれば自動的に整う。詳細は `claude-config/DESIGN.md §公開リポ leak 防止` および `§2026-04-28 追補`。
 
 ## 開発ルール
 

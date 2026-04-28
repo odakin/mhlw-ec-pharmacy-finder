@@ -28,6 +28,8 @@ EOF
   exit 1
 fi
 
+# 自分自身は pattern 文字列を grep 対象として抱えているので pathspec で
+# exclude (self-block 回避)。エディット時に削らないこと。
 PLACEHOLDER_HITS=$(
   git diff --cached --no-color -- ':(exclude).claude/pre-commit-extra.sh' 2>/dev/null \
     | grep '^+' | grep -v '^+++' \
