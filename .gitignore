@@ -16,6 +16,7 @@ __pycache__/
 # Claude Code
 .claude/*
 !.claude/public-repo.marker
+!.claude/pre-commit-extra.sh
 
 # Data artifacts (we DO commit data/ here on purpose)
 # Keep temporary downloads out

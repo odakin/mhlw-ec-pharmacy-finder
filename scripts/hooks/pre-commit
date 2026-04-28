@@ -1,30 +1,4 @@
-#!/bin/sh
-# Warn if docs/ files are staged but SESSION.md is not
-
-DOCS_CHANGED=$(git diff --cached --name-only -- docs/ | head -1)
-SESSION_CHANGED=$(git diff --cached --name-only -- SESSION.md | head -1)
-
-if [ -n "$DOCS_CHANGED" ] && [ -z "$SESSION_CHANGED" ]; then
-  echo ""
-  echo "⚠️  docs/ が変更されていますが SESSION.md が含まれていません。"
-  echo "   SESSION.md の更新を忘れていませんか？"
-  echo ""
-  echo "   このまま続けるには: git commit --no-verify"
-  echo ""
-  exit 1
-fi
-
-# Block placeholder text in staged files
-PLACEHOLDERS='(次コミット)\|(next commit)\|(TBD)\|(TODO: commit)'
-FOUND=$(git diff --cached -S"$(echo "$PLACEHOLDERS" | head -1)" --name-only 2>/dev/null)
-# Use grep on staged content for reliable multi-pattern matching
-FOUND=$(git diff --cached -- . | grep -i '^\+.*\((次コミット)\|(next commit)\)' | head -5)
-if [ -n "$FOUND" ]; then
-  echo ""
-  echo "⚠️  プレースホルダーが残っています:"
-  echo "$FOUND"
-  echo ""
-  echo "   コミットハッシュに置き換えてからコミットしてください。"
-  echo ""
-  exit 1
-fi
+#!/bin/bash
+# Stub installed by claude-config/scripts/install-public-precommit.sh
+# Do not edit — update public-precommit-runner.sh instead.
+exec "$HOME/Claude/claude-config/scripts/public-precommit-runner.sh" "$@"
