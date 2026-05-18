@@ -8,6 +8,10 @@ name: Dependabot auto-merge
 # Uses pull_request_target so the workflow runs from the base branch
 # (= no checkout of untrusted PR head; safe). With `--auto`, merge is
 # gated on any required status checks.
+#
+# If `allow_auto_merge` is not enabled on the repo (e.g. Free plan
+# private repo), the merge step is skipped with a notice rather than
+# failing — the PR stays open for manual merge.
 
 on: pull_request_target
 
@@ -20,16 +24,29 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
+      - name: Check auto-merge capability
+        id: capability
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          available=$(gh api "repos/${{ github.repository }}" --jq '.allow_auto_merge')
+          echo "available=$available" >> "$GITHUB_OUTPUT"
+          if [ "$available" != "true" ]; then
+            echo "::notice::auto-merge unavailable on this repo (likely Free plan + private). PR will remain open for manual merge."
+          fi
+
       - name: Get Dependabot metadata
         id: meta
         uses: dependabot/fetch-metadata@v2
 
       - name: Auto-merge safe updates
         if: |
-          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
-          steps.meta.outputs.update-type == 'version-update:semver-minor' ||
-          steps.meta.outputs.package-ecosystem == 'github-actions'
-        run: gh pr merge --auto --squash --delete-branch "$PR_URL"
+          steps.capability.outputs.available == 'true' && (
+            steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+            steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+            steps.meta.outputs.package-ecosystem == 'github-actions'
+          )
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash --delete-branch "$PR_URL"
