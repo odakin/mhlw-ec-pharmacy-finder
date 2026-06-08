@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stub installed by claude-config/scripts/install-public-commit-msg.sh
+# Do not edit — update commit-msg-leak-guard-runner.sh instead.
+exec "$HOME/Claude/claude-config/scripts/commit-msg-leak-guard-runner.sh" "$@"
