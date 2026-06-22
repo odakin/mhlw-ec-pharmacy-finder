@@ -509,6 +509,12 @@ Layer C: getHoursInfo() の拡張
   → holidaySchedule → 祝日時間を使用
   → どちらもなし → 通常曜日にフォールバック
 </code></pre>
+<h3 id="_10">週間スケジュールグリッドの表示順（月曜始まり）</h3>
+<p>折りたたみ全曜日表示の週間スケジュールグリッドは<strong>月曜始まり</strong>で並べる（月・火・水・木・金・土・日 + 祝日行を最後）。</p>
+<ul>
+<li>祝日行をグリッドの末尾に置けるため、構造として自然（日曜始まりだと祝日行の位置が中途半端になる）</li>
+<li>改修履歴の <code>c3a7f62</code>（祝日対応・月曜始まり化）で日曜始まりから変更</li>
+</ul>
 <h3 id="holidayclosed">holidayClosed の検出</h3>
 <p>生テキスト（正規化前）に対して6パターンの正規表現で検出:
 - <code>祝休み</code> <code>祝:休み</code> <code>祝は休業</code>（正順）
@@ -516,7 +522,7 @@ Layer C: getHoursInfo() の拡張
 - <code>祝を除く</code> <code>(祝除く)</code>（除外表現）
 - <code>祝祭日</code> → <code>祝</code> に正規化、半角カナ中黒 <code>･</code> も正規化</p>
 <p>検出率: 137件 / 152件（残り15件はパーサー本体の変更が必要でコスト高）。false positive: 0件。</p>
-<h3 id="_10">深夜営業の日跨ぎ判定</h3>
+<h3 id="_11">深夜営業の日跨ぎ判定</h3>
 <p><code>close &gt; 24:00</code>（例: 25:00 = 翌1:00）の営業枠が翌日に跨る場合:
 - 前日のスケジュールを確認し、<code>nowMin &lt; closeMin - 1440</code> で判定
 - 前日が祝日だった場合は祝日オーバーライドも考慮</p>
@@ -524,8 +530,8 @@ Layer C: getHoursInfo() の拡張
 <p><code>getHoursInfo()</code> 内の <code>toLocaleString("en-US", {timeZone: "Asia/Tokyo"})</code> は高コスト。
 カードごとに呼ぶと50回/検索で無駄。<code>getJstContext()</code> でバッチごとに1回だけ計算し、
 <code>getHoursInfo(raw, ctx)</code> に渡す設計に変更。</p>
-<h2 id="_11">コード上の注意点</h2>
-<h3 id="_12">正規化ルールの順序依存</h3>
+<h2 id="_12">コード上の注意点</h2>
+<h3 id="_13">正規化ルールの順序依存</h3>
 <p>多くのルールは前のルールの出力に依存する。例:</p>
 <ol>
 <li><code>時</code>→<code>:00</code> 変換は曜日strip後に実行する必要がある（<code>金9時</code> → <code>金9:00</code> → <code>金:9:00</code>）</li>
@@ -544,7 +550,7 @@ Layer C: getHoursInfo() の拡張
 - 祝日セグメント（週次スケジュールの対象外）
 - ordinalセグメント（第N限定は週次で表現不能、スキップが正解）
 - 不正な時間帯（データのタイプミス）</p>
-<h3 id="_13">テスト方法</h3>
+<h3 id="_14">テスト方法</h3>
 <pre><code class="language-sh"># カバー率テスト
 node -e '
 const code = require(&quot;fs&quot;).readFileSync(&quot;docs/app.js&quot;,&quot;utf8&quot;);
@@ -562,7 +568,7 @@ for (const r of data) {
 console.log(ok + &quot;/&quot; + total + &quot; = &quot; + (ok/total*100).toFixed(1) + &quot;%&quot;);
 '
 </code></pre>
-<h2 id="_14">改修履歴</h2>
+<h2 id="_15">改修履歴</h2>
 <table>
 <thead>
 <tr>
