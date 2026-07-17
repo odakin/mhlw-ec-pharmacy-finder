@@ -5,6 +5,11 @@ name: Dependabot auto-merge
 #   - Patch + minor semver updates in other ecosystems
 # Major-version updates are NOT auto-merged — they remain open for review.
 #
+# NOTE: fetch-metadata outputs package-ecosystem with UNDERSCORE
+# ('github_actions', 'npm_and_yarn', 'pip'), not the hyphenated name used in
+# dependabot.yml ('github-actions'). The original hyphen comparison never
+# matched = auto-merge never fired (found 2026-07-17, 16 days x 25 PRs stuck).
+#
 # Uses pull_request_target so the workflow runs from the base branch
 # (= no checkout of untrusted PR head; safe). With `--auto`, merge is
 # gated on any required status checks.
@@ -37,14 +42,14 @@ jobs:
 
       - name: Get Dependabot metadata
         id: meta
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@v2
 
       - name: Auto-merge safe updates
         if: |
           steps.capability.outputs.available == 'true' && (
             steps.meta.outputs.update-type == 'version-update:semver-patch' ||
             steps.meta.outputs.update-type == 'version-update:semver-minor' ||
-            steps.meta.outputs.package-ecosystem == 'github-actions'
+            steps.meta.outputs.package-ecosystem == 'github_actions'
           )
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
