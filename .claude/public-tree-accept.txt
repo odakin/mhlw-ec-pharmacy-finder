@@ -1,0 +1,12 @@
+# public-tree-accept.txt — scan-public-tree.sh の棚卸しで「見た上で残す」 と決めたもの。
+#
+# ⚠️ pre-commit gate には効かない (= 新しい書き込みは今までどおり止まる)。 効くのは
+#    claude-config/scripts/scan-public-tree.sh と check-activity-facts.py の棚卸しだけ。
+# `generated:` 行 = 外部の公開データを機械が変換して置いた file (データ形式だけ、 生成元必須)。
+#    中身は厚生労働省が公開している薬局・医療機関の一覧で、 名称・連絡先・営業時間が数千行並ぶ。
+
+generated: data/*.json          # scripts/update_data.py が厚労省の公開 xlsx から変換 (日付つき snapshot)
+generated: data/*.csv           # 同じ変換の CSV 版
+generated: docs/data.json       # scripts/update_data.py が最新の JSON を複写 (CI が更新)
+generated: docs/clinics.json    # scripts/update_clinics.py が厚労省の医療機関一覧から変換
+generated: line_bot/data.json   # scripts/update_data.py が最新の JSON を LINE bot 用に複写
