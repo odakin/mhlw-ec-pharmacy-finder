@@ -9,4 +9,5 @@ generated: data/*.json          # scripts/update_data.py が厚労省の公開 x
 generated: data/*.csv           # 同じ変換の CSV 版
 generated: docs/data.json       # scripts/update_data.py が最新の JSON を複写 (CI が更新)
 generated: docs/clinics.json    # scripts/update_clinics.py が厚労省の医療機関一覧から変換
+generated: docs/geocode_cache.json  # scripts/geocode.py が公開データの住所を緯度経度に変換した cache の複写
 generated: line_bot/data.json   # scripts/update_data.py が最新の JSON を LINE bot 用に複写
