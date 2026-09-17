@@ -1,5 +1,13 @@
 # AGENTS.md
 
+Before working in this repository, read `CLAUDE.md` and `SESSION.md`, then follow any task-relevant pointers in
+`CLAUDE.md` to their owning source before acting. Project structure, current state, and design decisions live in
+`CLAUDE.md`, `SESSION.md`, and `DESIGN.md`; do not duplicate them here. General contract:
+https://github.com/odakin/claude-config/blob/main/CONVENTIONS.md#agent-instruction-entrypoints
+
+The review and update guidelines below are kept in this file because Codex code review reads `AGENTS.md`;
+this file is their home (`CLAUDE.md` points here).
+
 ## Purpose
 This repository turns the MHLW (厚生労働省) published list of pharmacies that can sell emergency contraception (緊急避妊薬 / 要指導医薬品) into formats that are easier to search and reuse:
 - cleaned CSV/XLSX/JSON
