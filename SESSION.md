@@ -1,8 +1,6 @@
 # SESSION.md — mhlw-ec-pharmacy-finder
 
-## 現在の状態（2026-04-09）
-
-**全機能実装済み・運用中。**
+> 📌 SESSION.md = 案件ごとの現在地 + 正本への link (進んだら置き換える、 日付を見出しにした節・commit hash・messageId を置かない = 層1 claude-config/CONVENTIONS.md#session-no-durable-record)。 日付つきの節は SESSION-archive.md へ verbatim MOVE 済 (2026-09-28)。
 
 ## TODO
 
@@ -38,10 +36,3 @@
 - 週間スケジュール月曜始まり → docs/HOURS_PARSER.md §祝日対応「週間スケジュールグリッドの表示順」
 - 駅名・地名検索を実装しない → docs/DESIGN.md §5
 - 医療機関カードの注記削除 → docs/DESIGN.md §4）
-
-## Google Search Console（2026-03-23）
-
-- インデックス: 登録済み2ページ + ドキュメント3ページが「クロール済み - インデックス未登録」
-  - 対策: `scripts/build_docs.py` で Markdown を静的 HTML 変換。全6ページのインデックス登録リクエスト済み
-- 検索パフォーマンス（3/12-18）: 表示158回、クリック4回
-- サイトマップ: SC側バグで「取得できませんでした」表示だが実害なし
